@@ -12,13 +12,13 @@
 #'
 #' @return Shiny module.
 #' @export
-output_ui <- function(id, label = "Download", n) {
+download_ui <- function(id, label = "Download", n) {
   downloadButton(NS(id, paste0("download", n)), label)
 }
-#' @rdname output_ui
+#' @rdname download_ui
 #'
 #' @export
-output_server <- function(id, data, name, n, sep) {
+download_server <- function(id, data, name, n, sep = ",") {
 
   stopifnot(is.reactive(data))
   stopifnot(!is.reactive(name))
