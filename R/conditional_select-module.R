@@ -1,4 +1,5 @@
-filter_ui <- function(id, data, labels = NULL, logi = NULL, update = FALSE) {
+filter_ui <- function(id, data, labels = NULL, logi = NULL, update = FALSE,
+                      session =  NULL) {
 
   col_specs <- col_spec(data)
 
@@ -20,38 +21,69 @@ filter_ui <- function(id, data, labels = NULL, logi = NULL, update = FALSE) {
     id = ids
     )
 
-  if (is.null(labels)) ls_args <- append(ls_args, labels)
+  if (!is.null(labels)) {
+    ls_args$label <- labels
+    ls_args
+  }
 
   args <- purrr::pmap(ls_args, col_vals)
 
   # logical selection
   args$logical <- list(
-    inputID = id,
+    inputId = id,
     choices = names(col_specs)[col_specs == "logical"]
     )
 
-  if (is.null(logi)) args$logical$label <- logi
-  purrr::map2(type, args, ~rlang::call2(.x, !!!.y, .ns = "shiny"))
+  if (isFALSE(update)) {
+    if (!is.null(logi)) {
+      args$logical$label <- logi
+    } else {
+      args$logical$label <- "Various"
+    }
+  } else {
+    args <- purrr::map(args, ~append(.x, c(session = session)))
+  }
+  sls <- purrr::map2(type, args, ~rlang::call2(.x, !!!.y, .ns = "shiny"))
+  if (isTRUE(update)) {
+    sls
+  } else {
+    purrr::map(sls, eval)
+  }
 }
 
-filter_server <- function(id, vars) {
+filter_server <- function(id, data) {
+
+  stopifnot(is.reactive(data))
 
   moduleServer(id, function(input, output, session) {
 
-    purrr::iwalk(
-      vars,
-      ~{
-        select <- list()
-        select_name <- paste0("select", .y)
-        select[[select_name]] <- reactive({
-          dplyr::filter(GTS, )
-        })
-        observeEvent(select[[select_name]](),{
-          select[[select_name]]()
-
-        })
+    vars <- reactive({
+      v <- names(col_spec(data())[col_spec(data()) != "logical"])
+      if (any(col_spec(data()) == "logical")) {
+        v <- append(v, "logi")
       }
-    )
+      v
+      })
+
+    obs <- reactive({
+      purrr::map(vars(), ~filter_var(data()[[.x]], input[[.x]])) %>%
+        purrr::reduce(`&`)
+    })
+
+    # return data
+    filter <- reactive({data()[obs(), , drop = FALSE]})
+
+    # update the controllers to match the new data ranges
+    hdl <- reactive({
+      filter_ui(id = id, data = filter(), update = TRUE, session = session)
+    })
+    observe({
+      message(hdl())
+      purrr::walk2(vars(), hdl(), ~eval(observe_builder(.x, vars(), .y)))
+    })
+
+    # return
+    filter
   })
 }
 
@@ -71,7 +103,6 @@ detect_control <- function(data, update = FALSE) {
 
 col_spec <- function(data) vapply(data, class, character(1))
 
-
 col_vals <- function(col, id, label = NULL) {
 
   if (is.numeric(col)) {
@@ -83,16 +114,25 @@ col_vals <- function(col, id, label = NULL) {
     # Not supported
     NULL
   }
-  if (is.null(label)) vls$label <- label
+  if (!is.null(label)) vls$label <- label
   vls
 
 }
 
-react_builder <- function(tb, vars, input = list()) {
- filter_expr <- purrr::imap(vars, ~rlang::parse_expr(paste(.x, "== input$", paste0("depth", .y))))
- purrr::map(filter_expr, ~rlang::call2("filter", tb, .x, .ns = "dplyr"))
- # purrr::imap(vars, ~call("dplyr::filter", tb, )
-}
+# cond_server <- function(id, data, vars) {
+#
+#   stopifnot(is.reactive(data))
+#   stopifnot(is.reactive(vars))
+#
+#   moduleServer(id, function(input, output, session) {
+#
+#   hdl <- reactive({
+#     filter_ui(id = id, data = data(), update = TRUE, session = session)
+#   })
+#   observe(purrr::walk2(vars(), hdl(), ~observe_builder(.x, data(), .y, vars())))
+#
+#   })
+# }
 
 filter_var <- function(x, val = NULL) {
 
@@ -108,21 +148,33 @@ filter_var <- function(x, val = NULL) {
   }
 }
 
-observe_filter <- function(x, data, handle, ...) {
+observe_builder <- function(x, y, handle) {
 
-  args <- rlang::enquos(...)
-  y <- names(args)
+  # build expression `observeEvent`
+  sel <- y[!y %in% x]
 
-  #
-  sel <- args[!y %in% names(x)]
-  make_cond <- function(x, y) substitute(a|b, env = list(a = x, b = y))
-  cond <- purrr::map(1:length(sel), ~call("$", rlang::sym("input"), rlang::sym(names(sel[.x])))) %>%
+  make_cond <- function(x, y) substitute({a;b}, env = list(a = x, b = y))
+  cond <- purrr::map(
+    sel,
+    ~call("$", rlang::sym("input"), rlang::sym(.x))
+    ) %>%
     purrr::reduce(make_cond)
 
-  rlang::call2("observeEvent", eventExpr = cond, handlerExpr = handle , .ns = "shiny")
+  fr <- rlang::call2("freezeReactiveValue", rlang::sym("input"), x, .ns = "shiny")
 
-  #input[!names(input) %in% names(x)]
-  #rlang::call2("$", sym("input"), sym("id-filter"))
-
+  rlang::call2(
+    "observeEvent",
+    eventExpr = cond,
+    handlerExpr = substitute({fr;handle}),
+    #handlerExpr = {rlang::expr(message({{x}}))}, # convenient for testing
+    .ns = "shiny"
+    )
+  # shiny::observeEvent(
+  #   eventExpr = cond,
+  #   #handlerExpr = handle,
+  #   handlerExpr = message(x),
+  #   #event.quoted = TRUE,
+  #   #handler.quoted = TRUE
+  #   )
 }
 
