@@ -12,15 +12,21 @@ test_that("gui and update gui can be generated", {
     col_vals(xc$speed, "id", "speed", NULL, TRUE)
   )
   expect_snapshot(
-    filter_ui("id", xc, c("Speed", "Distribution"), "other")
+    col_vals("character", "iris$Species", "id", "species", NULL, FALSE)
+  )
+  expect_snapshot(
+    col_vals(iris$Species, "id", "species", NULL, FALSE)
+  )
+  expect_snapshot(
+    filter_ui(NS("test", "id"), xc, c("Speed", "Distribution"), "other")
   )
   # default label for logical
   expect_snapshot(
-    filter_ui("id", xc, c("Speed", "Distribution"))
+    filter_ui("test", xc, c("Speed", "Distribution"))
   )
   # no labels for update
   expect_snapshot(
-    filter_ui("id", xc, update = TRUE)
+    filter_ui(dat = xc, update = TRUE)
   )
 })
 
@@ -28,16 +34,20 @@ test_that("gui and update gui can be generated", {
 test_that("that server works" {
   reactiveConsole(TRUE)
   input <- reactiveValues()
-  #input <- list()
+  input <- list()
   input$speed <- 1:10
   input$dist <- 21:50
   input$logi <- rep(TRUE, 10)
   vars <- reactive(c("speed", "dist", "logi"))
-  data <- reactive(xc)
+  dat <- reactive(xc)
+  vars <- c("speed", "dist", "logi")
+
   #vars <- c("speed", "dist", "logi")
   hdl <- reactive(filter_ui(id = "id", data = xc, update = TRUE, session = getDefaultReactiveDomain()))
-  purrr::walk2(vars(), hdl(), ~observe_builder(.x, vars(), .y))
-  # observe_builder("speed", xc, hdl[[1]], input)
+
+  hdl <- filter_ui(id = "id", data = xc, update = TRUE, session = getDefaultReactiveDomain())
+  purrr::map(vars(), ~observe_builder(.x,  hdl))
+
   reactiveConsole(FALSE)
 })
 
@@ -77,7 +87,6 @@ ui <- fluidPage(
 )
 server <- function(input, output, session) {
   filter_server("test", reactive(xc))
-  # cond_server("test", reactive(xc), reactive(c("speed", "dist", "logi")))
 }
 
 shinyApp(ui, server)
