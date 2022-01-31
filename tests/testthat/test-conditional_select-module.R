@@ -57,56 +57,57 @@ test_that("that server update functions work",{
 
 })
 
-test_that("that server update functions work",{
-  # dataset
-  xc <- cbind(lg1 = rep(TRUE, nrow(cars)), cars, lg2 = rep(TRUE, nrow(cars)))
-  reactiveConsole(TRUE)
-  input <- reactiveValues()
-  input$speed <- 1:10
-  input$dist <- 21:50
-  input$logi <- rep(TRUE, 10)
-  vars <- reactive(c("speed", "dist", "logi"))
-  dat <- reactive(xc)
-
-  # the controllers
-  hdl <- filter_ui(dat = dat(), update = TRUE, shinyjs = TRUE)
-  expect_snapshot(hdl)
-  # the observer event
-  expect_invisible(
-    observe_builder("speed", hdl, dat = dat())
-  )
-  reactiveConsole(FALSE)
-})
-
-# test_that("server can filter", {
-#   x <- reactiveVal(xc)
-#   testServer(filter_server, args = list(dat = x), {
-#     # set
-#     # x(xc)
-#     session$flushReact()
-#     # get
-#     dataset <- session$getReturned()
-#     # input
-#     # session$setInputs(speed = c(4, 13))
-#     print(dataset())
-#     # session$setInputs(dist = c(60, 120))
+# test_that("that server update functions work",{
+#   # dataset
+#   xc <- cbind(lg1 = rep(TRUE, nrow(cars)), cars, lg2 = rep(TRUE, nrow(cars)))
+#   reactiveConsole(TRUE)
+#   input <- reactiveValues()
+#   input$speed <- 1:10
+#   input$dist <- 21:50
+#   input$logi <- rep(TRUE, 10)
+#   vars <- reactive(c("speed", "dist", "logi"))
+#   dat <- reactive(xc)
 #
-#   })
-#   dplyr::filter(xc, .data$speed < 13) %>% dplyr::pull(dist) %>% range()
+#   # the controllers
+#   hdl <- filter_ui(dat = dat(), update = TRUE, shinyjs = TRUE)
+#   expect_snapshot(hdl)
+#   # the observer event
+#   expect_invisible(
+#     observe_builder("speed", hdl, dat = dat())
+#   )
+#   reactiveConsole(FALSE)
 # })
 
-xc <- cbind(lg1 = rep(TRUE, nrow(cars)), cars, lg2 = rep(TRUE, nrow(cars)))
+test_that("server can filter", {
+  # dataset
+  xc <- cbind(lg1 = rep(TRUE, nrow(cars)), cars, lg2 = rep(TRUE, nrow(cars)))
+  x <- reactiveVal()
+  testServer(filter_server, args = list(dat = x), {
+    # set
+    x(xc)
+    session$flushReact()
+    # get
+    dataset <- session$getReturned()
+    # input
+    session$setInputs(speed = c(4, 13))
+    expect_snapshot(dataset())
+    # session$setInputs(dist = c(60, 120))
+  })
+  #dplyr::filter(xc, .data$speed < 13) %>% dplyr::pull(dist) %>% range()
+})
+
+# xc <- cbind(lg1 = rep(TRUE, nrow(cars)), cars, lg2 = rep(TRUE, nrow(cars)))
+# #
+# ui <- fluidPage(
+#   sidebarLayout(
+#     sidebarPanel(filter_ui("test", iris, shinyjs = T)),
+#     mainPanel(tableOutput("table"))
+#   )
+# )
+# server <- function(input, output, session) {
+#   ft <- filter_server("test", reactive(iris), shinyjs =T)
+#   output$table <- renderTable({req(ft()); ft()})
 #
-ui <- fluidPage(
-  sidebarLayout(
-    sidebarPanel(filter_ui("test", xc, shinyjs = T)),
-    mainPanel(tableOutput("table"))
-  )
-)
-server <- function(input, output, session) {
-  ft <- filter_server("test", reactive(xc), shinyjs =T)
-  output$table <- renderTable({req(ft()); ft()})
-
-}
-
-shinyApp(ui, server)
+# }
+#
+# shinyApp(ui, server)

@@ -1,3 +1,21 @@
+#' Conditional filter module
+#'
+#' The module is constructed so that the filter controls are updated based on
+#' the data range.
+#'
+#' @param id Namespace of the module.
+#' @param dat The data supplied as `dataframe` or tibble.
+#' @param labels Labels for the controllers (defaults to the variable names).
+#' @param logi Label for the controller of logical variables (defaults to
+#'  `"Various"`.
+#' @param update Logical indicating whether ui controllers are ui- or
+#'  server-side for updating the controllers ranges.
+#' @param session The shiny session domain.
+#' @param shinyjs A logical indicating whether shinyjs `ToggleState()` is
+#'  included to disable controllers.
+#'
+#' @return Shiny module.
+#' @export
 filter_ui <- function(id, dat, labels = NULL, logi = NULL, update = FALSE,
                       session =  getDefaultReactiveDomain(), shinyjs = FALSE) {
 
@@ -47,8 +65,6 @@ filter_ui <- function(id, dat, labels = NULL, logi = NULL, update = FALSE,
   # append session and get exit
   if (isTRUE(update)) {
     args <- purrr::map(args, ~append(.x, c(session = session)))
-    # exit <- purrr::map(args, list("exit"))
-    # args <- purrr::map(args, ~purrr::list_modify(.x, "exit" = NULL))
   }
 
   # gui controllers
@@ -64,11 +80,9 @@ filter_ui <- function(id, dat, labels = NULL, logi = NULL, update = FALSE,
     # use shinyjs
     if (isTRUE(shinyjs) & requireNamespace("shinyjs"))  {
       purrr::list_merge(svr, !!!swth)
-      #%>% purrr::list_merge(!!!exit)
     } else {
-      purrr::list_merge(svr) #, !!!exit)
+      purrr::list_merge(svr)
     }
-
   } else {
     ui <- purrr::map(sls, rlang::eval_tidy)
     # use shinyjs
@@ -79,7 +93,9 @@ filter_ui <- function(id, dat, labels = NULL, logi = NULL, update = FALSE,
     }
   }
 }
-
+#' @rdname filter_ui
+#'
+#' @export
 filter_server <- function(id, dat, shinyjs = FALSE) {
 
   stopifnot(is.reactive(dat))
@@ -112,7 +128,9 @@ filter_server <- function(id, dat, shinyjs = FALSE) {
   })
 }
 
-
+#-------------------------------------------------------------------------------
+# helper functions
+#-------------------------------------------------------------------------------
 # variable class data
 col_spec <- function(data) vapply(data, class, character(1))
 
@@ -156,32 +174,22 @@ col_vals <- function(class, col, id, label = NULL, session = NULL,
       max = !!fun_rng("max", col),
       value = !!fun_rng("range", col)
       )
-
     vls$inputId <- rlang::get_expr(id)
-    # if (isTRUE(update)) {
-    #   exit <- rlang::call2("filter_var", rlang::parse_expr(col), call("$", rlang::sym("input"), gsub("(.)*\\$", "", col)))
-    #   vls$exit <- rlang::expr(req(any(!!exit), cancelOutput = TRUE))
-    # }
     if (isTRUE(shinyjs) & isTRUE(update)) {
-      vls$switch <- switch_controller(col, fun_rng("range", col), method = "diff")
+      vls$switch <- switch_controller(col, fun_rng("range", col), "diff",
+                                      fun_rng("diff", col))
     }
   } else if (class == "character" | class == "factor") {
     fun_lvls <- function(col) {
       rlang::call2("unique", rlang::parse_expr(col))
-      # %>%
-      #   rlang::call2("levels", .)
     }
     vls <- rlang::exprs(
       choices = !!fun_lvls(col),
       selected = !!fun_lvls(col)
       )
     vls$inputId <- rlang::get_expr(id)
-    # if (isTRUE(update)) {
-    #   exit <- rlang::call2("filter_var", rlang::parse_expr(col), call("$", rlang::sym("input"), gsub("(.)*\\$", "", col)))
-    #   vls$exit <- rlang::expr(req(any(!!exit), cancelOutput = TRUE))
-    # }
     if (isTRUE(shinyjs) & isTRUE(update)) {
-      vls$switch <- switch_controller(col, fun_lvls(col), method = "length")
+      vls$switch <- switch_controller(col, fun_lvls(col), "length", 1)
     }
   } else {
     # Not supported
@@ -194,7 +202,6 @@ col_vals <- function(class, col, id, label = NULL, session = NULL,
   }
 
   vls
-
 }
 
 # filter operation on the dataset based on variable class
@@ -251,8 +258,11 @@ observe_builder <- function(x, y, dat, show = FALSE) {
 }
 
 # toggle state
-switch_controller <- function(var, x, method) {
+switch_controller <- function(var, x, method, val) {
   var <- gsub("(.)*\\$", "", var)
-  cond <- rlang::parse_expr(paste(deparse(rlang::call2(method, x)), "> 1"))
+  if (rlang::is_expression(val)) {
+    val <- deparse(rlang::call2("min", val))
+  }
+  cond <- rlang::parse_expr(paste(deparse(rlang::call2(method, x)), ">", val))
   rlang::call2("toggleState", var, cond, .ns = "shinyjs")
 }
