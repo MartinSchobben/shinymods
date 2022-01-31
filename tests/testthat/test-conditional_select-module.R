@@ -51,8 +51,8 @@ test_that("that server update functions work",{
   hdl <- filter_ui(dat = xc, update = TRUE, shinyjs = TRUE)
   expect_snapshot(hdl)
   # the observer event
-  expect_invisible(
-    observe_builder("speed", hdl)
+  expect_snapshot(
+    observe_builder("speed", hdl, dat = xc, show = TRUE)
     )
 
 })
@@ -73,9 +73,9 @@ test_that("that server update functions work",{
   expect_snapshot(hdl)
   # the observer event
   expect_invisible(
-    observe_builder("speed", hdl)
+    observe_builder("speed", hdl, dat = dat())
   )
-
+  reactiveConsole(FALSE)
 })
 
 # test_that("server can filter", {
@@ -99,12 +99,12 @@ xc <- cbind(lg1 = rep(TRUE, nrow(cars)), cars, lg2 = rep(TRUE, nrow(cars)))
 #
 ui <- fluidPage(
   sidebarLayout(
-    sidebarPanel(filter_ui("test", iris, shinyjs = T)),
+    sidebarPanel(filter_ui("test", xc, shinyjs = T)),
     mainPanel(tableOutput("table"))
   )
 )
 server <- function(input, output, session) {
-  ft <- filter_server("test", reactive(iris), shinyjs = T)
+  ft <- filter_server("test", reactive(xc), shinyjs =T)
   output$table <- renderTable({req(ft()); ft()})
 
 }
