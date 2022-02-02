@@ -98,16 +98,16 @@ test_that("server can filter", {
 
 # xc <- cbind(lg1 = rep(TRUE, nrow(cars)), cars, lg2 = rep(TRUE, nrow(cars)))
 # #
-# ui <- fluidPage(
-#   sidebarLayout(
-#     sidebarPanel(filter_ui("test", iris, shinyjs = T)),
-#     mainPanel(tableOutput("table"))
-#   )
-# )
-# server <- function(input, output, session) {
-#   ft <- filter_server("test", reactive(iris), shinyjs =T)
-#   output$table <- renderTable({req(ft()); ft()})
-#
-# }
-#
-# shinyApp(ui, server)
+ui <- fluidPage(
+  sidebarLayout(
+    sidebarPanel(filter_ui("test", iris, shinyjs = T)),
+    mainPanel(tableOutput("table"))
+  )
+)
+server <- function(input, output, session) {
+  ft <- filter_server("test", reactive(iris), shinyjs =T)
+  output$table <- renderTable({req(ft()); ft()})
+
+}
+
+shinyApp(ui, server)

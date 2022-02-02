@@ -112,7 +112,9 @@ filter_server <- function(id, dat, shinyjs = FALSE) {
     })
 
     # return data
-    filter <- reactive({dat()[obs(), , drop = FALSE]})
+    filter <- reactive({
+      dat()[obs(), , drop = FALSE]
+    })
 
     # update the controllers to match the new data ranges
     observeEvent(filter(), {
@@ -166,18 +168,17 @@ col_vals <- function(class, col, id, label = NULL, session = NULL,
   stopifnot(is.character(col))
 
   if (class == "numeric") {
-    fun_rng <- function(stat, col) {
-      rlang::call2(stat, rlang::parse_expr(col), na.rm = TRUE)
+    fun_rng <- function(stat, col, ...) {
+      rlang::call2(stat, rlang::parse_expr(col), ...)
     }
     vls <- rlang::exprs(
-      min = !!fun_rng("min", col),
-      max = !!fun_rng("max", col),
-      value = !!fun_rng("range", col)
+      min = !!fun_rng("min", col, na.rm = TRUE),
+      max = !!fun_rng("max", col, na.rm = TRUE),
+      value = !!fun_rng("range", col, na.rm = TRUE)
       )
     vls$inputId <- rlang::get_expr(id)
     if (isTRUE(shinyjs) & isTRUE(update)) {
-      vls$switch <- switch_controller(col, fun_rng("range", col), "diff",
-                                      fun_rng("diff", col))
+      vls$switch <- switch_controller(col, fun_rng("unique", col), "length", 1)
     }
   } else if (class == "character" | class == "factor") {
     fun_lvls <- function(col) {
@@ -227,16 +228,19 @@ observe_builder <- function(x, y, dat, show = FALSE) {
   nms <- names(y)[!names(y) %in% x]
 
   # event
-  evt <- call("$", rlang::sym("input"), x)
-  org <- call("$", substitute(dat), x)
+  evt <- rlang::call2("$", rlang::sym("input"), x)
+  # original data
+  dt <- rlang::enexpr(dat)
+  org <- rlang::call2("$", rlang::expr(!!dt), x)
 
-  # exit
-  exit <- rlang::call2("filter_var", org , evt, remove_na = FALSE)
-  exit <- rlang::expr(req(any(!!exit), cancelOutput = TRUE))
+  # exit by `req` validation of filter operation
+  filter <- rlang::call2("filter_var", org , evt, remove_na = FALSE)
+  exit <- rlang::call2("req", rlang::expr(any(!!filter)), cancelOutput = TRUE)
 
   # combine handle
   xprs <- rlang::list2(exit, !!!rev(rlang::flatten(unname(sel))))
 
+  # for debugging purposes also enable viewing the `observeEvent` expression
   if (isTRUE(show)) {
     rlang::call2(
       "observeEvent",
@@ -251,7 +255,8 @@ observe_builder <- function(x, y, dat, show = FALSE) {
       event.env = rlang::caller_env(),
       event.quoted = TRUE,
       handler.env = rlang::caller_env(),
-      handler.quoted = TRUE
+      handler.quoted = TRUE,
+      ignoreInit = TRUE
     )
   }
 
@@ -260,9 +265,9 @@ observe_builder <- function(x, y, dat, show = FALSE) {
 # toggle state
 switch_controller <- function(var, x, method, val) {
   var <- gsub("(.)*\\$", "", var)
-  if (rlang::is_expression(val)) {
-    val <- deparse(rlang::call2("min", val))
-  }
+  # if (rlang::is_expression(val)) {
+  #   val <- deparse(rlang::call2("min", val))
+  # }
   cond <- rlang::parse_expr(paste(deparse(rlang::call2(method, x)), ">", val))
   rlang::call2("toggleState", var, cond, .ns = "shinyjs")
 }
