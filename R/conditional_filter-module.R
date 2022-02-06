@@ -265,9 +265,6 @@ observe_builder <- function(x, y, dat, show = FALSE) {
 # toggle state
 switch_controller <- function(var, x, method, val) {
   var <- gsub("(.)*\\$", "", var)
-  # if (rlang::is_expression(val)) {
-  #   val <- deparse(rlang::call2("min", val))
-  # }
   cond <- rlang::parse_expr(paste(deparse(rlang::call2(method, x)), ">", val))
   rlang::call2("toggleState", var, cond, .ns = "shinyjs")
 }

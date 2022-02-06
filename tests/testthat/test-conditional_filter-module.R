@@ -79,18 +79,18 @@ test_that("that server update functions work",{
 # })
 
 test_that("server can filter", {
-  # dataset
-  xc <- cbind(lg1 = rep(TRUE, nrow(cars)), cars, lg2 = rep(TRUE, nrow(cars)))
   x <- reactiveVal()
   testServer(filter_server, args = list(dat = x), {
     # set
-    x(xc)
-    session$flushReact()
+    x(cars2)
+    # session$flushReact()
     # get
     dataset <- session$getReturned()
     # input
-    session$setInputs(speed = c(4, 13))
-    expect_snapshot(dataset())
+    session$setInputs(logi = "speed_high")
+
+    print(dataset())
+    # expect_snapshot(dataset())
     # session$setInputs(dist = c(60, 120))
   })
   #dplyr::filter(xc, .data$speed < 13) %>% dplyr::pull(dist) %>% range()
