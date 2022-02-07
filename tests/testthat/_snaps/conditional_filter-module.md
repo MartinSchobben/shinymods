@@ -76,7 +76,7 @@
 ---
 
     Code
-      filter_ui("test", cars2, c("Speed", "Distribution"), "other")
+      filter_ui("test", dat = cars2, labels = c("Speed", "Distribution"), logi = "other")
     Output
       [[1]]
       <div class="form-group shiny-input-container">
@@ -104,7 +104,7 @@
 ---
 
     Code
-      filter_ui("test", cars2, c("Speed", "Distribution"))
+      filter_ui("test", dat = cars2, labels = c("Speed", "Distribution"))
     Output
       [[1]]
       <div class="form-group shiny-input-container">
@@ -127,6 +127,56 @@
           <script type="application/json" data-for="test-logi" data-eval="[&quot;onInitialize&quot;]">{"placeholder":"select","onInitialize":"function() { this.setValue(null); }","plugins":["selectize-plugin-a11y"]}</script>
         </div>
       </div>
+      
+
+---
+
+    Code
+      detect_control(cars2, external = "dist")
+    Output
+      [1] "sliderInput"    "selectizeInput"
+
+---
+
+    Code
+      filter_ui("test", dat = cars2, external = "speed", labels = "Distribution",
+        logi = "other")
+    Output
+      [[1]]
+      <div class="form-group shiny-input-container">
+        <label class="control-label" id="test-dist-label" for="test-dist">Distribution</label>
+        <input class="js-range-slider" id="test-dist" data-skin="shiny" data-type="double" data-min="2" data-max="120" data-from="2" data-to="120" data-step="1" data-grid="true" data-grid-num="9.83333333333333" data-grid-snap="false" data-prettify-separator="," data-prettify-enabled="true" data-keyboard="true" data-drag-interval="true" data-data-type="number"/>
+      </div>
+      
+      [[2]]
+      <div class="form-group shiny-input-container">
+        <label class="control-label" id="test-logi-label" for="test-logi">other</label>
+        <div>
+          <select id="test-logi" class="form-control" multiple="multiple"><option value="high_speed">high_speed</option>
+      <option value="high_dist">high_dist</option></select>
+          <script type="application/json" data-for="test-logi" data-eval="[&quot;onInitialize&quot;]">{"placeholder":"select","onInitialize":"function() { this.setValue(null); }","plugins":["selectize-plugin-a11y"]}</script>
+        </div>
+      </div>
+      
+
+---
+
+    Code
+      filter_ui(dat = cars2, external = reactiveValues(speed = 4:14), update = TRUE)
+    Output
+      $speed
+      shiny::updateSliderInput(min = min(cars2$speed, na.rm = TRUE), 
+          max = max(cars2$speed, na.rm = TRUE), value = range(cars2$speed, 
+              na.rm = TRUE), inputId = "speed")
+      
+      $dist
+      shiny::updateSliderInput(min = min(cars2$dist, na.rm = TRUE), 
+          max = max(cars2$dist, na.rm = TRUE), value = range(cars2$dist, 
+              na.rm = TRUE), inputId = "dist")
+      
+      $logi
+      shiny::updateSelectizeInput(inputId = "logi", choices = c("high_speed", 
+      "high_dist"))
       
 
 ---
@@ -242,7 +292,7 @@
 # that server update functions work
 
     Code
-      hdl
+      hdl1
     Output
       $speed
       $speed[[1]]
@@ -272,7 +322,54 @@
 ---
 
     Code
-      observe_builder("speed", hdl, dat = cars2, show = TRUE)
+      observe_builder("speed", hdl1, dat = cars2, show = TRUE)
+    Output
+      shiny::observeEvent(eventExpr = input$speed, handlerExpr = {
+          req(any(filter_var(cars2$speed, input$speed, remove_na = FALSE)), 
+              cancelOutput = TRUE)
+          shiny::updateSelectizeInput(inputId = "logi", choices = c("high_speed", 
+          "high_dist"))
+          shinyjs::toggleState("dist", length(unique(cars2$dist)) > 
+              1)
+          shiny::updateSliderInput(min = min(cars2$dist, na.rm = TRUE), 
+              max = max(cars2$dist, na.rm = TRUE), value = range(cars2$dist, 
+                  na.rm = TRUE), inputId = "dist")
+      })
+
+---
+
+    Code
+      hdl2
+    Output
+      $speed
+      $speed[[1]]
+      shiny::updateSliderInput(min = min(cars2$speed, na.rm = TRUE), 
+          max = max(cars2$speed, na.rm = TRUE), value = range(cars2$speed, 
+              na.rm = TRUE), inputId = "speed")
+      
+      $speed[[2]]
+      shinyjs::toggleState("speed", length(unique(cars2$speed)) > 1)
+      
+      
+      $dist
+      $dist[[1]]
+      shiny::updateSliderInput(min = min(cars2$dist, na.rm = TRUE), 
+          max = max(cars2$dist, na.rm = TRUE), value = range(cars2$dist, 
+              na.rm = TRUE), inputId = "dist")
+      
+      $dist[[2]]
+      shinyjs::toggleState("dist", length(unique(cars2$dist)) > 1)
+      
+      
+      $logi
+      shiny::updateSelectizeInput(inputId = "logi", choices = c("high_speed", 
+      "high_dist"))
+      
+
+---
+
+    Code
+      observe_builder("speed", hdl2, dat = cars2, show = TRUE)
     Output
       shiny::observeEvent(eventExpr = input$speed, handlerExpr = {
           req(any(filter_var(cars2$speed, input$speed, remove_na = FALSE)), 

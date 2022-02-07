@@ -127,10 +127,6 @@ filter_server <- function(id, dat, external = reactiveValues(), shinyjs = FALSE)
         purrr::reduce(`&`)
     })
 
-    # observe(message(glue::glue("{names(input2)}")))
-    # observe(message(glue::glue("{str(reactiveValuesToList(input2))}")))
-    # # observe(message(glue::glue("{str(external)}")))
-
     # return data
     filter <- reactive({
       dat()[obs(), , drop = FALSE]

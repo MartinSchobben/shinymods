@@ -76,7 +76,7 @@ test_that("that server update functions work", {
 })
 
 test_that("server can filter", {
-  x <- reactiveVal(cars2)
+  x <- reactiveVal()
   testServer(filter_server, args = list(dat = x), {
     # set
     x(cars2)
