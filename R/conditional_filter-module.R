@@ -48,17 +48,21 @@ filter_ui <- function(id, dat, labels = NULL, logi = NULL, update = FALSE,
   if (any(col_specs == "logical")) {
     args$logical <- list(
       inputId = if (isTRUE(update)) "logi" else NS(id, "logi"),
-      choices = names(col_specs)[col_specs == "logical"],
-      selected = names(col_specs)[col_specs == "logical"]
-      )
+      choices = names(col_specs)[col_specs == "logical"]
+    )
 
     if (isFALSE(update)) {
-      args$logical$multiple = TRUE
       if (!is.null(logi)) {
         args$logical$label <- logi
       } else {
         args$logical$label <- "Various"
       }
+    args$logical$multiple <- TRUE
+    # args$logical$selected <- NULL
+    args$logical$options <- list(
+      placeholder = "select",
+      onInitialize = I('function() { this.setValue(null); }')
+    )
     }
   }
 
@@ -81,7 +85,7 @@ filter_ui <- function(id, dat, labels = NULL, logi = NULL, update = FALSE,
     if (isTRUE(shinyjs) & requireNamespace("shinyjs"))  {
       purrr::list_merge(svr, !!!swth)
     } else {
-      purrr::list_merge(svr)
+      svr
     }
   } else {
     ui <- purrr::map(sls, rlang::eval_tidy)
@@ -107,9 +111,15 @@ filter_server <- function(id, dat, shinyjs = FALSE) {
 
     # filter observations
     obs <- reactive({
-      purrr::map(vars(), ~filter_var(dat()[[.x]], input[[.x]])) %>%
+      purrr::map(
+        c(vars(), input$logi),
+        ~filter_var(dat()[[.x]], input[[.x]])
+      ) %>%
         purrr::reduce(`&`)
     })
+
+#     observe(message(glue::glue("{str(reactiveValuesToList(input))}")))
+#     observe(message(glue::glue("{str(obs())}")))
 
     # return data
     filter <- reactive({
@@ -125,8 +135,8 @@ filter_server <- function(id, dat, shinyjs = FALSE) {
     once = TRUE
     )
 
-    # return
-    filter
+    # return only non logical column vars
+    reactive({filter()[, col_spec(filter()) != "logical", drop = FALSE]})
   })
 }
 
@@ -138,11 +148,7 @@ col_spec <- function(data) vapply(data, class, character(1))
 
 # reactive value names for input
 variable_names <- function(dat) {
-  v <- names(col_spec(dat))[col_spec(dat) != "logical"]
-  if (any(col_spec(dat) == "logical")) {
-    v <- append(v, "logi")
-  }
-  v
+  names(col_spec(dat))[col_spec(dat) != "logical"]
 }
 
 # determine type of gui controller based on variable class
@@ -151,7 +157,7 @@ detect_control <- function(data, update = FALSE) {
                "factor" = "selectInput")
   cnr <- control[col_spec(data)[col_spec(data) != "logical"]]
   if (any(col_spec(data) == "logical")) {
-    cnr <- append(cnr, c("logical" = "selectInput"))
+    cnr <- append(cnr, c("logical" = "selectizeInput"))
   }
   if (isTRUE(update)) {
     substring(cnr, 1) <- toupper(substring(cnr, 1, 1))
@@ -201,18 +207,20 @@ col_vals <- function(class, col, id, label = NULL, session = NULL,
   if (isFALSE(update) & (class == "character" | class == "factor")) {
     vls$multiple <- TRUE
   }
-
   vls
 }
 
 # filter operation on the dataset based on variable class
 filter_var <- function(x, val = NULL, remove_na = FALSE) {
 
+  # # shortcut with val `NULL`
+  if (is.null(x) & is.null(val))  return(TRUE)
+
   if (is.numeric(x)) {
     y <- x >= val[1] & x <= val[2]
   } else if (is.character(x) | is.factor(x)) {
     y <- x %in% val
-  } else if (is.logical(x)) {
+  } else if (is.logical(x) & is.null(val)) {
     y <- x
   } else {
     # No control, so don't filter
