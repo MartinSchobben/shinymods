@@ -16,15 +16,16 @@
 #'
 #' @return Shiny module.
 #' @export
-filter_ui <- function(id, dat, labels = NULL, logi = NULL, update = FALSE,
-                      session =  getDefaultReactiveDomain(), shinyjs = FALSE) {
+filter_ui <- function(id, dat, external = NULL, labels = NULL, logi = NULL,
+                      update = FALSE, session =  getDefaultReactiveDomain(),
+                      shinyjs = FALSE) {
 
   # classes
-  col_specs <- col_spec(dat)
+  col_specs <- col_spec(dat, external = external)
 
   # variable names and types
-  var <- names(dat)[col_specs != "logical"]
-  type <- detect_control(dat, update = update)
+  var <- names(col_specs)[col_specs != "logical"] # remove logicals and externals from names
+  type <- detect_control(dat, update = update, external = external)
   var_exprs <- paste0(deparse(substitute(dat)),"$", var)
   ls_args <- list(
     class = col_specs[col_specs != "logical"],
@@ -57,12 +58,11 @@ filter_ui <- function(id, dat, labels = NULL, logi = NULL, update = FALSE,
       } else {
         args$logical$label <- "Various"
       }
-    args$logical$multiple <- TRUE
-    # args$logical$selected <- NULL
-    args$logical$options <- list(
-      placeholder = "select",
-      onInitialize = I('function() { this.setValue(null); }')
-    )
+      args$logical$multiple <- TRUE
+      args$logical$options <- list(
+        placeholder = "select",
+        onInitialize = I('function() { this.setValue(null); }')
+      )
     }
   }
 
@@ -100,11 +100,20 @@ filter_ui <- function(id, dat, labels = NULL, logi = NULL, update = FALSE,
 #' @rdname filter_ui
 #'
 #' @export
-filter_server <- function(id, dat, shinyjs = FALSE) {
+filter_server <- function(id, dat, external = reactiveValues(), shinyjs = FALSE) {
 
   stopifnot(is.reactive(dat))
+  stopifnot(is.reactivevalues(external))
 
   moduleServer(id, function(input, output, session) {
+
+    # store input in custom `reactivalues`
+    input2 <- reactiveValues()
+    # bind input in custom `reactivalues`
+    observe({
+      purrr::walk(names(input),  ~{input2[[.x]] <- input[[.x]]})
+      purrr::walk(names(external),  ~{input2[[.x]] <- external[[.x]]})
+    })
 
     # variable names
     vars <- reactive({variable_names(dat())})
@@ -112,14 +121,15 @@ filter_server <- function(id, dat, shinyjs = FALSE) {
     # filter observations
     obs <- reactive({
       purrr::map(
-        c(vars(), input$logi),
-        ~filter_var(dat()[[.x]], input[[.x]])
+        c(vars(), input2$logi),
+        ~filter_var(dat()[[.x]], input2[[.x]])
       ) %>%
         purrr::reduce(`&`)
     })
 
-#     observe(message(glue::glue("{str(reactiveValuesToList(input))}")))
-#     observe(message(glue::glue("{str(obs())}")))
+    # observe(message(glue::glue("{names(input2)}")))
+    # observe(message(glue::glue("{str(reactiveValuesToList(input2))}")))
+    # # observe(message(glue::glue("{str(external)}")))
 
     # return data
     filter <- reactive({
@@ -128,14 +138,14 @@ filter_server <- function(id, dat, shinyjs = FALSE) {
 
     # update the controllers to match the new data ranges
     observeEvent(filter(), {
-      hdl <- filter_ui(dat = filter(), update = TRUE, session = session,
-                       shinyjs = shinyjs)
-      purrr::walk(vars(), ~observe_builder(.x, hdl, dat = filter()))
+      hdl <- filter_ui(dat = filter(), external = external, update = TRUE,
+                       session = session, shinyjs = shinyjs)
+      purrr::walk(vars(), ~observe_builder(.x, y = hdl, dat = filter()))
     },
     once = TRUE
     )
 
-    # return only non logical column vars
+    # return only non-logical column vars
     reactive({filter()[, col_spec(filter()) != "logical", drop = FALSE]})
   })
 }
@@ -144,19 +154,26 @@ filter_server <- function(id, dat, shinyjs = FALSE) {
 # helper functions
 #-------------------------------------------------------------------------------
 # variable class data
-col_spec <- function(data) vapply(data, class, character(1))
+col_spec <- function(dat, external = NULL) {
+  if (!is.null(external)) {
+    dat <- dat[, !(names(dat) %in% external), drop = FALSE]
+  }
+  vapply(dat, class, character(1))
+}
 
 # reactive value names for input
-variable_names <- function(dat) {
+variable_names <- function(dat , external = NULL) {
   names(col_spec(dat))[col_spec(dat) != "logical"]
 }
 
 # determine type of gui controller based on variable class
-detect_control <- function(data, update = FALSE) {
+detect_control <- function(data, update = FALSE, external = NULL) {
   control <- c("numeric" = "sliderInput", "character" = "selectInput",
                "factor" = "selectInput")
-  cnr <- control[col_spec(data)[col_spec(data) != "logical"]]
-  if (any(col_spec(data) == "logical")) {
+  # get types of variables except logicals
+  types <- col_spec(data, external = external)
+  cnr <- control[types[types != "logical"]]
+  if (any(col_spec(data, external = external) == "logical")) {
     cnr <- append(cnr, c("logical" = "selectizeInput"))
   }
   if (isTRUE(update)) {

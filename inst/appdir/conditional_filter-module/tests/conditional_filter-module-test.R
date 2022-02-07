@@ -1,2 +1,2 @@
 library(shinytest)
-recordTest("inst/appdir/conditional_filter-module")
+recordTest("inst/appdir/conditional_filter-module/")

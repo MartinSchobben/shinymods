@@ -3,6 +3,10 @@ test_that("gui and update gui can be generated", {
     detect_control(cars2),
     c("sliderInput", "sliderInput", "selectizeInput")
     )
+  expect_equal(
+    detect_control(cars2),
+    c("updateSliderInput", "updateSliderInput", "updateSelectizeInput")
+  )
   expect_snapshot(
     col_vals("numeric", "cars2$speed", "test", "speed", NULL, FALSE)
   )
@@ -17,11 +21,21 @@ test_that("gui and update gui can be generated", {
   )
   # custom labels
   expect_snapshot(
-    filter_ui("test", cars2, c("Speed", "Distribution"), "other")
+    filter_ui("test", dat = cars2, labels  = c("Speed", "Distribution"), logi = "other")
   )
   # default label for logical
   expect_snapshot(
-    filter_ui("test", cars2, c("Speed", "Distribution"))
+    filter_ui("test", dat = cars2, labels  = c("Speed", "Distribution"))
+  )
+  # external filter (e.g. from a different module with e.g. plot selection)
+  expect_snapshot(
+    detect_control(cars2, external = "dist")
+  )
+  expect_snapshot(
+    filter_ui("test", dat = cars2, external = "speed", labels  = "Distribution", logi = "other")
+  )
+  expect_snapshot(
+    filter_ui(dat = cars2, external = reactiveValues(speed = 4:14), update = TRUE)
   )
   # no labels for update
   expect_snapshot(
@@ -44,12 +58,20 @@ test_that("that server update functions work", {
   vars <- c("speed", "dist", "logi")
 
   # the controllers
-  hdl <- filter_ui(dat = cars2, update = TRUE, shinyjs = TRUE)
-  expect_snapshot(hdl)
+  hdl1 <- filter_ui(dat = cars2, update = TRUE, shinyjs = TRUE)
+  expect_snapshot(hdl1)
   # the observer event
   expect_snapshot(
-    observe_builder("speed", hdl, dat = cars2, show = TRUE)
-    )
+    observe_builder("speed", hdl1, dat = cars2, show = TRUE)
+  )
+  # the controllers
+  hdl2 <- filter_ui(dat = cars2, external = reactiveValues(speed = 4:14), update = TRUE, shinyjs = TRUE)
+  expect_snapshot(hdl2)
+  # the observer event
+  expect_snapshot(
+    observe_builder("speed", hdl2, dat = cars2, show = TRUE)
+  )
+
 
 })
 
