@@ -4,7 +4,7 @@ test_that("gui and update gui can be generated", {
     c("sliderInput", "sliderInput", "selectizeInput")
     )
   expect_equal(
-    detect_control(cars2),
+    detect_control(cars2, update = TRUE),
     c("updateSliderInput", "updateSliderInput", "updateSelectizeInput")
   )
   expect_snapshot(
@@ -65,14 +65,13 @@ test_that("that server update functions work", {
     observe_builder("speed", hdl1, dat = cars2, show = TRUE)
   )
   # the controllers
-  hdl2 <- filter_ui(dat = cars2, external = reactiveValues(speed = 4:14), update = TRUE, shinyjs = TRUE)
+  hdl2 <- filter_ui(dat = cars2, external = reactiveValues(speed = 4:14),
+                    update = TRUE, shinyjs = TRUE)
   expect_snapshot(hdl2)
   # the observer event
   expect_snapshot(
     observe_builder("speed", hdl2, dat = cars2, show = TRUE)
   )
-
-
 })
 
 test_that("server can filter", {
@@ -84,7 +83,7 @@ test_that("server can filter", {
     # get
     dataset <- session$getReturned()
     # input
-    session$setInputs(speed = range(cars2$speed), dist = range(cars2$dist), logi = "")
+    session$setInputs(speed = range(cars2$speed), dist = range(cars2$dist))
     # compare
     expect_equal(dataset(), cars)
   })
