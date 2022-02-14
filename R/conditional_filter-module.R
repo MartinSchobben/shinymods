@@ -13,6 +13,12 @@
 #' @param session The shiny session domain.
 #' @param shinyjs A logical indicating whether shinyjs `ToggleState()` is
 #'  included to disable controllers.
+#' @param external Character string/vector (filter_ui) or `reactiveValues`
+#'  (filter_server) assigning external filter variables to the module.
+#' @param ignore Character string/vector for variables to be ignored for
+#'  filtering of the dataset.
+#' @param remove_na Logical indicating whether NAs should be removed during
+#'  filtering (defaults to FALSE).
 #'
 #' @return Shiny module.
 #' @export
@@ -70,7 +76,7 @@ filter_ui <- function(id, dat, external = NULL, labels = NULL, logi = NULL,
         placeholder = "select",
         onInitialize = I('function() { this.setValue(null); }')
       )
-    } else {
+    } else if (isTRUE(shinyjs)) {
       args$logi$switch <- switch_controller("logi", call_logi_cols, "length", 0)
     }
   }
@@ -144,8 +150,6 @@ filter_server <- function(id, dat, external = reactiveValues(),
       dat()[obs(), , drop = FALSE]
     })
 
-    observe(message(glue::glue("{c(vars(), input2$logi)}")))
-
     # update the controllers to match the new data ranges
     observeEvent(filter(), {
       hdl <- filter_ui(dat = filter(), external = names(external),
@@ -211,20 +215,24 @@ col_vals <- function(class, col, id, label = NULL, session = NULL,
 
   if (class == "numeric") {
     vls <- rlang::exprs(
+      inputId = !!rlang::get_expr(id),
       min = !!fun_rng("min", col, na.rm = TRUE),
       max = !!fun_rng("max", col, na.rm = TRUE),
       value = !!fun_rng("range", col, na.rm = TRUE)
       )
-    vls$inputId <- rlang::get_expr(id)
-    if (isTRUE(shinyjs) & isTRUE(update)) {
-      vls$switch <- switch_controller(col, fun_rng("unique", col), "length", 1)
+    if (isTRUE(update)) {
+      # select what is needed for updating
+      vls <- vls[c("inputId", "value")]
+      if (isTRUE(shinyjs)) {
+        vls$switch <- switch_controller(col, fun_rng("unique", col), "length", 1)
+      }
     }
   } else if (class == "character" | class == "factor") {
     vls <- rlang::exprs(
+      inputId = !!rlang::get_expr(id),
       choices = !!fun_lvls(col, remove_na = remove_na),
       selected = !!fun_lvls(col, remove_na = remove_na)
       )
-    vls$inputId <- rlang::get_expr(id)
     if (isTRUE(shinyjs) & isTRUE(update)) {
       vls$switch <- switch_controller(
         col,
@@ -260,7 +268,7 @@ fun_rng <- function(stat, col, ...) {
   rlang::call2(stat, rlang::parse_expr(col), ...)
 }
 
-# generati expression for logical vars toggle switch condition
+# generating expression for logical vars toggle switch condition
 logi_cols <- function(dat, external, ignore) {
 
   col_specs <- col_spec(dat, ignore = ignore, external = external)

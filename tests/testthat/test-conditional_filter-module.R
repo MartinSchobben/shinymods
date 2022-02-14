@@ -1,4 +1,7 @@
 test_that("gui and update gui can be generated", {
+  # load shinjs if needed
+  if (isFALSE(requireNamespace("shinyjs"))) library(shinyjs)
+
   expect_equal(
     detect_control(cars2),
     c("sliderInput", "sliderInput", "selectizeInput")
@@ -51,7 +54,10 @@ test_that("gui and update gui can be generated", {
               logi = "other", ignore = "dist")
   )
   expect_snapshot(
-    filter_ui(dat = cars2, external = "speed", update = TRUE)
+    filter_ui(dat = cars2, external = "speed", update = TRUE, shinyjs = FALSE)
+  )
+  expect_snapshot(
+    filter_ui(dat = cars2, external = "speed", update = TRUE, shinyjs = TRUE)
   )
   # no labels for update
   expect_snapshot(
@@ -65,17 +71,10 @@ test_that("gui and update gui can be generated", {
   )
 })
 
-test_that("toggle switch for logical can be generated for long lists of ignore", {
-  RGS <- RGS::get_standard_business_reporting("Nederland")
-  ignore_vars <- c("referentie_omslagcode", "sortering", "referentienummer",
-                   "omschrijving_verkort", "omschrijving", "terminal")
-  call_logi_cols <- rlang::call2("logi_cols", rlang::expr(RGS), ignore = ignore_vars, external = NULL)
-  expect_snapshot(
-    switch_controller("logi", call_logi_cols, "length", 0)
-  )
-})
-
 test_that("that server update functions work", {
+  # load shinjs if needed
+  if (isFALSE(requireNamespace("shinyjs"))) library(shinyjs)
+
   # prepare
   input <- list()
   input$speed <- 1:10
@@ -105,8 +104,11 @@ test_that("that server update functions work", {
 })
 
 test_that("server can filter", {
+  # load shinjs if needed
+  if (isFALSE(requireNamespace("shinyjs"))) library(shinyjs)
+
   x <- reactiveVal()
-  testServer(filter_server, args = list(dat = x), {
+  testServer(filter_server, args = list(dat = x, ignore = ""), {
     # set
     x(cars2)
     session$flushReact()
@@ -115,6 +117,7 @@ test_that("server can filter", {
     # input
     session$setInputs(speed = range(cars2$speed), dist = range(cars2$dist))
     # compare
+    #print(dataset())
     expect_equal(dataset(), cars)
   })
 })

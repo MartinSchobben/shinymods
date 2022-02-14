@@ -8,19 +8,32 @@
 filter_ui(
   id,
   dat,
+  external = NULL,
   labels = NULL,
   logi = NULL,
   update = FALSE,
   session = getDefaultReactiveDomain(),
-  shinyjs = FALSE
+  shinyjs = FALSE,
+  ignore = NULL,
+  remove_na = FALSE
 )
 
-filter_server(id, dat, shinyjs = FALSE)
+filter_server(
+  id,
+  dat,
+  external = reactiveValues(),
+  ignore = character(0),
+  shinyjs = FALSE,
+  remove_na = FALSE
+)
 }
 \arguments{
 \item{id}{Namespace of the module.}
 
 \item{dat}{The data supplied as \code{dataframe} or tibble.}
+
+\item{external}{Character string/vector (filter_ui) or \code{reactiveValues}
+(filter_server) assigning external filter variables to the module.}
 
 \item{labels}{Labels for the controllers (defaults to the variable names).}
 
@@ -34,6 +47,12 @@ server-side for updating the controllers ranges.}
 
 \item{shinyjs}{A logical indicating whether shinyjs \code{ToggleState()} is
 included to disable controllers.}
+
+\item{ignore}{Character string/vector for variables to be ignored for
+filtering of the dataset.}
+
+\item{remove_na}{Logical indicating whether NAs should be removed during
+filtering (defaults to FALSE).}
 }
 \value{
 Shiny module.

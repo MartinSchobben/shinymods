@@ -1,9 +1,12 @@
-test_that("download module server works", {
-  ui <- fluidPage(download_ui("data", n = 1))
-  server <- function(input, output, session) {
-    download_server("data", reactive(cars), "cars", 1, ',')
-  }
-  app <- shinytest::ShinyDriver$new(shinyApp(ui, server))
-  app$click("download1")
-  app$getValue("download1")
+test_that("module for downloading", {
+  # Don't run these tests on the CRAN build servers
+  skip_on_cran()
+  skip_on_ci()
+  skip_if_offline()
+
+  # Use compareImages=FALSE because the expected image screenshots were created
+  # on a Mac, and they will differ from screenshots taken on the CI platform,
+  # which runs on Linux.
+  appdir <- system.file(package = "shinymods", "appdir", "download-module")
+  shinytest::expect_pass(shinytest::testApp(appdir, compareImages = FALSE))
 })
