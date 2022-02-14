@@ -19,6 +19,14 @@ test_that("gui and update gui can be generated", {
   expect_snapshot(
     col_vals("character", "iris$Species", "species", update = TRUE)
   )
+  # variable names
+  expect_snapshot(
+    variable_names(cars2)
+  )
+  # ignoring variable names
+  expect_snapshot(
+    variable_names(cars2, ignore = "speed")
+  )
   # custom labels
   expect_snapshot(
     filter_ui("test", dat = cars2, labels  = c("Speed", "Distribution"), logi = "other")
@@ -32,10 +40,18 @@ test_that("gui and update gui can be generated", {
     detect_control(cars2, external = "dist")
   )
   expect_snapshot(
-    filter_ui("test", dat = cars2, external = "speed", labels  = "Distribution", logi = "other")
+    detect_control(cars2, external = "dist", ignore = "speed")
   )
   expect_snapshot(
-    filter_ui(dat = cars2, external = reactiveValues(speed = 4:14), update = TRUE)
+    filter_ui("test", dat = cars2, external = "speed", labels  = "Distribution",
+              logi = "other")
+  )
+  expect_snapshot(
+    filter_ui("test", dat = cars2, external = "speed", labels  = "Distribution",
+              logi = "other", ignore = "dist")
+  )
+  expect_snapshot(
+    filter_ui(dat = cars2, external = "speed", update = TRUE)
   )
   # no labels for update
   expect_snapshot(
@@ -46,6 +62,16 @@ test_that("gui and update gui can be generated", {
   )
   expect_snapshot(
     filter_ui(dat = iris, update = TRUE, shinyjs = TRUE)
+  )
+})
+
+test_that("toggle switch for logical can be generated for long lists of ignore", {
+  RGS <- RGS::get_standard_business_reporting("Nederland")
+  ignore_vars <- c("referentie_omslagcode", "sortering", "referentienummer",
+                   "omschrijving_verkort", "omschrijving", "terminal")
+  call_logi_cols <- rlang::call2("logi_cols", rlang::expr(RGS), ignore = ignore_vars, external = NULL)
+  expect_snapshot(
+    switch_controller("logi", call_logi_cols, "length", 0)
   )
 })
 
@@ -64,8 +90,12 @@ test_that("that server update functions work", {
   expect_snapshot(
     observe_builder("speed", hdl1, dat = cars2, show = TRUE)
   )
+  # the observer event (logical)
+  expect_snapshot(
+    observe_builder("logi", hdl1, dat = cars2, show = TRUE)
+  )
   # the controllers
-  hdl2 <- filter_ui(dat = cars2, external = reactiveValues(speed = 4:14),
+  hdl2 <- filter_ui(dat = cars2, external = "speed",
                     update = TRUE, shinyjs = TRUE)
   expect_snapshot(hdl2)
   # the observer event

@@ -18,14 +18,14 @@
 #' @export
 filter_ui <- function(id, dat, external = NULL, labels = NULL, logi = NULL,
                       update = FALSE, session =  getDefaultReactiveDomain(),
-                      shinyjs = FALSE) {
+                      shinyjs = FALSE, ignore = NULL, remove_na = FALSE) {
 
   # classes
-  col_specs <- col_spec(dat, external = external)
+  col_specs <- col_spec(dat, external = external, ignore = ignore)
 
   # variable names and types
   var <- names(col_specs)[col_specs != "logical"] # remove logicals and externals from names
-  type <- detect_control(dat, update = update, external = external)
+  type <- detect_control(dat, update = update, external = external, ignore = ignore)
   var_exprs <- paste0(deparse(substitute(dat)),"$", var)
   ls_args <- list(
     class = col_specs[col_specs != "logical"],
@@ -43,26 +43,35 @@ filter_ui <- function(id, dat, external = NULL, labels = NULL, logi = NULL,
   }
 
   # make body of arguments for shiny controllers
-  args <- purrr::pmap(ls_args, col_vals, update = update, shinyjs = shinyjs)
+  args <- purrr::pmap(ls_args, col_vals, update = update, shinyjs = shinyjs,
+                      remove_na = remove_na)
 
   # logical selection
   if (any(col_specs == "logical")) {
-    args$logical <- list(
+    call_logi_cols <- rlang::call2("logi_cols", substitute(dat), ignore = ignore, external = external)
+    args$logi <- list(
       inputId = if (isTRUE(update)) "logi" else NS(id, "logi"),
-      choices = names(col_specs)[col_specs == "logical"]
+      choices = if (isTRUE(update)) call_logi_cols else eval(call_logi_cols),
+      selected = if (isTRUE(update)) {
+        rlang::call2("isolate", rlang::expr(input$logi), .ns = "shiny")
+      } else {
+        NULL
+      }
     )
 
     if (isFALSE(update)) {
       if (!is.null(logi)) {
-        args$logical$label <- logi
+        args$logi$label <- logi
       } else {
-        args$logical$label <- "Various"
+        args$logi$label <- "Various"
       }
-      args$logical$multiple <- TRUE
-      args$logical$options <- list(
+      args$logi$multiple <- TRUE
+      args$logi$options <- list(
         placeholder = "select",
         onInitialize = I('function() { this.setValue(null); }')
       )
+    } else {
+      args$logi$switch <- switch_controller("logi", call_logi_cols, "length", 0)
     }
   }
 
@@ -100,10 +109,13 @@ filter_ui <- function(id, dat, external = NULL, labels = NULL, logi = NULL,
 #' @rdname filter_ui
 #'
 #' @export
-filter_server <- function(id, dat, external = reactiveValues(), shinyjs = FALSE) {
+filter_server <- function(id, dat, external = reactiveValues(),
+                          ignore = character(0), shinyjs = FALSE,
+                          remove_na = FALSE) {
 
   stopifnot(is.reactive(dat))
   stopifnot(is.reactivevalues(external))
+  stopifnot(is.character(ignore))
 
   moduleServer(id, function(input, output, session) {
 
@@ -116,13 +128,13 @@ filter_server <- function(id, dat, external = reactiveValues(), shinyjs = FALSE)
     })
 
     # variable names
-    vars <- reactive({variable_names(dat())})
+    vars <- reactive({variable_names(dat(), ignore = ignore)})
 
     # filter observations
     obs <- reactive({
       purrr::map(
         c(vars(), input2$logi),
-        ~filter_var(dat()[[.x]], input2[[.x]])
+        ~filter_var(dat()[[.x]], input2[[.x]], remove_na = remove_na)
       ) %>%
         purrr::reduce(`&`)
     })
@@ -132,11 +144,21 @@ filter_server <- function(id, dat, external = reactiveValues(), shinyjs = FALSE)
       dat()[obs(), , drop = FALSE]
     })
 
+    observe(message(glue::glue("{c(vars(), input2$logi)}")))
+
     # update the controllers to match the new data ranges
     observeEvent(filter(), {
-      hdl <- filter_ui(dat = filter(), external = external, update = TRUE,
-                       session = session, shinyjs = shinyjs)
-      purrr::walk(vars(), ~observe_builder(.x, y = hdl, dat = filter()))
+      hdl <- filter_ui(dat = filter(), external = names(external),
+                       update = TRUE, session = session,
+                       ignore = ignore, shinyjs = shinyjs,
+                       remove_na = remove_na)
+      # if logical variables exist "logi" is appended
+      if (length(logi_cols(filter(), names(external), ignore)) > 0) {
+        vars <- c(vars(), "logi")
+      } else {
+        vars <- vars()
+      }
+      purrr::walk(vars, ~observe_builder(.x, y = hdl, dat = filter()))
     },
     once = TRUE
     )
@@ -150,26 +172,26 @@ filter_server <- function(id, dat, external = reactiveValues(), shinyjs = FALSE)
 # helper functions
 #-------------------------------------------------------------------------------
 # variable class data
-col_spec <- function(dat, external = NULL) {
-  if (!is.null(external)) {
-    dat <- dat[, !(names(dat) %in% external), drop = FALSE]
+col_spec <- function(dat, external = NULL, ignore = NULL) {
+  if (!is.null(external) | !is.null(ignore)) {
+    dat <- dat[, !(names(dat) %in% c(external, ignore)), drop = FALSE]
   }
   vapply(dat, class, character(1))
 }
 
 # reactive value names for input
-variable_names <- function(dat , external = NULL) {
-  names(col_spec(dat))[col_spec(dat) != "logical"]
+variable_names <- function(dat , ignore = NULL) {
+  names(col_spec(dat))[col_spec(dat) != "logical" & !(names(dat) %in% ignore)]
 }
 
 # determine type of gui controller based on variable class
-detect_control <- function(data, update = FALSE, external = NULL) {
+detect_control <- function(data, update = FALSE, external = NULL, ignore = NULL) {
   control <- c("numeric" = "sliderInput", "character" = "selectInput",
                "factor" = "selectInput")
   # get types of variables except logicals
-  types <- col_spec(data, external = external)
+  types <- col_spec(data, external = external, ignore = ignore)
   cnr <- control[types[types != "logical"]]
-  if (any(col_spec(data, external = external) == "logical")) {
+  if (any(col_spec(data, external = external, ignore = ignore) == "logical")) {
     cnr <- append(cnr, c("logical" = "selectizeInput"))
   }
   if (isTRUE(update)) {
@@ -182,14 +204,12 @@ detect_control <- function(data, update = FALSE, external = NULL) {
 
 # returns body of arguments for gui controllers
 col_vals <- function(class, col, id, label = NULL, session = NULL,
-                     update = FALSE, shinyjs = FALSE) {
+                     update = FALSE, shinyjs = FALSE, remove_na = FALSE) {
 
+  stopifnot(is.character(class))
   stopifnot(is.character(col))
 
   if (class == "numeric") {
-    fun_rng <- function(stat, col, ...) {
-      rlang::call2(stat, rlang::parse_expr(col), ...)
-    }
     vls <- rlang::exprs(
       min = !!fun_rng("min", col, na.rm = TRUE),
       max = !!fun_rng("max", col, na.rm = TRUE),
@@ -200,16 +220,18 @@ col_vals <- function(class, col, id, label = NULL, session = NULL,
       vls$switch <- switch_controller(col, fun_rng("unique", col), "length", 1)
     }
   } else if (class == "character" | class == "factor") {
-    fun_lvls <- function(col) {
-      rlang::call2("unique", rlang::parse_expr(col))
-    }
     vls <- rlang::exprs(
-      choices = !!fun_lvls(col),
-      selected = !!fun_lvls(col)
+      choices = !!fun_lvls(col, remove_na = remove_na),
+      selected = !!fun_lvls(col, remove_na = remove_na)
       )
     vls$inputId <- rlang::get_expr(id)
     if (isTRUE(shinyjs) & isTRUE(update)) {
-      vls$switch <- switch_controller(col, fun_lvls(col), "length", 1)
+      vls$switch <- switch_controller(
+        col,
+        fun_lvls(col, remove_na = remove_na),
+        "length",
+        1
+      )
     }
   } else {
     # Not supported
@@ -221,6 +243,32 @@ col_vals <- function(class, col, id, label = NULL, session = NULL,
     vls$multiple <- TRUE
   }
   vls
+}
+
+# generate expression for character/logical toggle switch condition
+fun_lvls <- function(col, remove_na) {
+  if (isTRUE(remove_na)) {
+    col <- rlang::parse_expr(col)
+  } else {
+    col <- rlang::call2("na.omit", rlang::parse_expr(col))
+  }
+  rlang::call2("unique", col)
+}
+
+# generate expression for numeric toggle switch condition
+fun_rng <- function(stat, col, ...) {
+  rlang::call2(stat, rlang::parse_expr(col), ...)
+}
+
+# generati expression for logical vars toggle switch condition
+logi_cols <- function(dat, external, ignore) {
+
+  col_specs <- col_spec(dat, ignore = ignore, external = external)
+  vrs <- names(col_specs)[col_specs == "logical"]
+
+  # check if columns have any `TRUE`
+  chk <- vapply(dat[, vrs, drop = FALSE], any, logical(1), na.rm = TRUE)
+  vrs[chk]
 }
 
 # filter operation on the dataset based on variable class
@@ -249,14 +297,26 @@ observe_builder <- function(x, y, dat, show = FALSE) {
   nms <- names(y)[!names(y) %in% x]
 
   # event
-  evt <- rlang::call2("$", rlang::sym("input"), x)
+  evt <- rlang::call2("$", rlang::sym("input2"), x)
   # original data
   dt <- rlang::enexpr(dat)
   org <- rlang::call2("$", rlang::expr(!!dt), x)
 
   # exit by `req` validation of filter operation
-  filter <- rlang::call2("filter_var", org , evt, remove_na = FALSE)
-  exit <- rlang::call2("req", rlang::expr(any(!!filter)), cancelOutput = TRUE)
+  if (x == "logi") {
+    # logical columns available
+    filter_cols <- rlang::call2(
+      "logi_cols",
+      rlang::parse_expr(paste0(dt, "()")),
+      external = rlang::sym("external"),
+      ignore = rlang::sym("ignore")
+      )
+    filter <- rlang::expr(length(!!filter_cols) > 0)
+  } else {
+    # levels or ranges in variables available
+    filter <- rlang::expr(any(!!rlang::call2("filter_var", org , evt, remove_na = FALSE)))
+  }
+  exit <- rlang::call2("req", filter, cancelOutput = TRUE)
 
   # combine handle
   xprs <- rlang::list2(exit, !!!rev(rlang::flatten(unname(sel))))
@@ -280,12 +340,13 @@ observe_builder <- function(x, y, dat, show = FALSE) {
       ignoreInit = TRUE
     )
   }
-
 }
 
 # toggle state
 switch_controller <- function(var, x, method, val) {
   var <- gsub("(.)*\\$", "", var)
-  cond <- rlang::parse_expr(paste(deparse(rlang::call2(method, x)), ">", val))
+  fun <- deparse1(rlang::call2(method, x), collapse = " ")
+  cond <- rlang::parse_expr(paste(fun, ">", val))
   rlang::call2("toggleState", var, cond, .ns = "shinyjs")
+
 }
