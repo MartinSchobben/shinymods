@@ -46,7 +46,7 @@ test_that("gui and update gui can be generated", {
     detect_control(cars2, external = "dist", ignore = "speed")
   )
   expect_snapshot(
-    filter_ui("test", dat = cars2, external = "speed", labels  = "Distribution",
+    filter_ui("test", dat = cars2, external = list("speed"), labels  = "Distribution",
               logi = "other")
   )
   expect_snapshot(

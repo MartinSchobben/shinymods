@@ -22,9 +22,15 @@
 #'
 #' @return Shiny module.
 #' @export
-filter_ui <- function(id, dat, external = NULL, labels = NULL, logi = NULL,
+filter_ui <- function(id, dat, external = list(NULL), labels = NULL, logi = NULL,
                       update = FALSE, session =  getDefaultReactiveDomain(),
-                      shinyjs = FALSE, ignore = NULL, remove_na = FALSE) {
+                      shinyjs = FALSE, ignore = character(0), remove_na = FALSE) {
+
+  # initiate R6 and bind to environment
+  rlang::env_bind(
+    rlang::caller_env(),
+    FD = FilterData$new(dat, external, ignore, shinyjs, remove_na)
+  )
 
   # classes
   col_specs <- col_spec(dat, external = external, ignore = ignore)
@@ -37,7 +43,7 @@ filter_ui <- function(id, dat, external = NULL, labels = NULL, logi = NULL,
     class = col_specs[col_specs != "logical"],
     col = var_exprs,
     id = if (isTRUE(update)) var else NS(id, var)
-    )
+  )
   if (isFALSE(update)) {
     if (!is.null(labels)) {
       ls_args$label <- labels
@@ -54,7 +60,8 @@ filter_ui <- function(id, dat, external = NULL, labels = NULL, logi = NULL,
 
   # logical selection
   if (any(col_specs == "logical")) {
-    call_logi_cols <- rlang::call2("logi_cols", substitute(dat), ignore = ignore, external = external)
+    call_logi_cols <- rlang::call2("logi_cols", substitute(dat),
+                                   ignore = ignore, external = external)
     args$logi <- list(
       inputId = if (isTRUE(update)) "logi" else NS(id, "logi"),
       choices = if (isTRUE(update)) call_logi_cols else eval(call_logi_cols),
@@ -115,39 +122,19 @@ filter_ui <- function(id, dat, external = NULL, labels = NULL, logi = NULL,
 #' @rdname filter_ui
 #'
 #' @export
-filter_server <- function(id, dat, external = reactiveValues(),
-                          ignore = character(0), shinyjs = FALSE,
-                          remove_na = FALSE) {
-
-  stopifnot(is.reactive(dat))
-  stopifnot(is.reactivevalues(external))
-  stopifnot(is.character(ignore))
+filter_server <- function(id, .filterStore) {
 
   moduleServer(id, function(input, output, session) {
 
     # store input in custom `reactivalues`
-    input2 <- reactiveValues()
-    # bind input in custom `reactivalues`
-    observe({
-      purrr::walk(names(input),  ~{input2[[.x]] <- input[[.x]]})
-      purrr::walk(names(external),  ~{input2[[.x]] <- external[[.x]]})
-    })
+    input2 <- .filterStore$addvars(input)
 
     # variable names
     vars <- reactive({variable_names(dat(), ignore = ignore)})
 
-    # filter observations
-    obs <- reactive({
-      purrr::map(
-        c(vars(), input2$logi),
-        ~filter_var(dat()[[.x]], input2[[.x]], remove_na = remove_na)
-      ) %>%
-        purrr::reduce(`&`)
-    })
-
-    # return data
+    # filter observations (with R6 object)
     filter <- reactive({
-      dat()[obs(), , drop = FALSE]
+      .filterStore$filter(vars, input2)
     })
 
     # update the controllers to match the new data ranges
@@ -277,25 +264,6 @@ logi_cols <- function(dat, external, ignore) {
   # check if columns have any `TRUE`
   chk <- vapply(dat[, vrs, drop = FALSE], any, logical(1), na.rm = TRUE)
   vrs[chk]
-}
-
-# filter operation on the dataset based on variable class
-filter_var <- function(x, val = NULL, remove_na = FALSE) {
-
-  # # shortcut with val `NULL`
-  if (is.null(x) & is.null(val))  return(TRUE)
-
-  if (is.numeric(x)) {
-    y <- x >= val[1] & x <= val[2]
-  } else if (is.character(x) | is.factor(x)) {
-    y <- x %in% val
-  } else if (is.logical(x) & is.null(val)) {
-    y <- x
-  } else {
-    # No control, so don't filter
-    y <- TRUE
-  }
-  if (isTRUE(remove_na)) y  & !is.na(x) else y | is.na(x)
 }
 
 observe_builder <- function(x, y, dat, show = FALSE) {

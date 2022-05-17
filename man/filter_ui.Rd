@@ -8,24 +8,17 @@
 filter_ui(
   id,
   dat,
-  external = NULL,
+  external = list(NULL),
   labels = NULL,
   logi = NULL,
   update = FALSE,
   session = getDefaultReactiveDomain(),
   shinyjs = FALSE,
-  ignore = NULL,
+  ignore = character(0),
   remove_na = FALSE
 )
 
-filter_server(
-  id,
-  dat,
-  external = reactiveValues(),
-  ignore = character(0),
-  shinyjs = FALSE,
-  remove_na = FALSE
-)
+filter_server(id, .filterStore)
 }
 \arguments{
 \item{id}{Namespace of the module.}
