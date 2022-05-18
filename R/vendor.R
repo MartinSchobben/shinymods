@@ -24,8 +24,8 @@ shinymods_vendor <- function(module, path = ".") {
   new <- file.path(path, "R", module)
 
   if (file.exists(new)) {
-    stop("'", new, "' already exists\n * run unlink('", new,
-         "', recursive = TRUE)", call. = FALSE)
+    stop("'", new, "' already exists\n * run file.remove('", new,
+         "')", call. = FALSE)
   }
 
   # check if location has R directory
@@ -37,5 +37,4 @@ shinymods_vendor <- function(module, path = ".") {
   file.copy(old, dirname(new))
 
   invisible(new)
-  new
 }
