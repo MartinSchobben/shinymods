@@ -1,77 +1,22 @@
 test_that("gui and update gui can be generated", {
-  # load shinjs if needed
-  if (isFALSE(requireNamespace("shinyjs"))) library(shinyjs)
 
-  expect_equal(
-    detect_control(cars2),
-    c("sliderInput", "sliderInput", "selectizeInput")
-    )
-  expect_equal(
-    detect_control(cars2, update = TRUE),
-    c("updateSliderInput", "updateSliderInput", "updateSelectizeInput")
-  )
+  # generate gui
+   expect_snapshot(
+     filter_ui(cars2, "testthat")
+   )
+  # update gui
   expect_snapshot(
-    col_vals("numeric", "cars2$speed", "test", "speed", NULL, FALSE)
+    filter_ui(cars2, "testthat", update = T)
   )
+
+  # use shinyjs
   expect_snapshot(
-    col_vals("numeric", "cars2$speed", "test", "speed", NULL, TRUE)
-  )
-  expect_snapshot(
-    col_vals("character", "iris$Species", "test", "species", NULL, FALSE)
-  )
-  expect_snapshot(
-    col_vals("character", "iris$Species", "species", update = TRUE)
-  )
-  # variable names
-  expect_snapshot(
-    variable_names(cars2)
-  )
-  # ignoring variable names
-  expect_snapshot(
-    variable_names(cars2, ignore = "speed")
-  )
-  # custom labels
-  expect_snapshot(
-    filter_ui("test", dat = cars2, labels  = c("Speed", "Distribution"), logi = "other")
-  )
-  # default label for logical
-  expect_snapshot(
-    filter_ui("test", dat = cars2, labels  = c("Speed", "Distribution"))
-  )
-  # external filter (e.g. from a different module with e.g. plot selection)
-  expect_snapshot(
-    detect_control(cars2, external = "dist")
-  )
-  expect_snapshot(
-    detect_control(cars2, external = "dist", ignore = "speed")
-  )
-  expect_snapshot(
-    filter_ui("test", dat = cars2, external = list("speed"), labels  = "Distribution",
-              logi = "other")
-  )
-  expect_snapshot(
-    filter_ui("test", dat = cars2, external = "speed", labels  = "Distribution",
-              logi = "other", ignore = "dist")
-  )
-  expect_snapshot(
-    filter_ui(dat = cars2, external = "speed", update = TRUE, shinyjs = FALSE)
-  )
-  expect_snapshot(
-    filter_ui(dat = cars2, external = "speed", update = TRUE, shinyjs = TRUE)
-  )
-  # no labels for update
-  expect_snapshot(
-    filter_ui(dat = cars2, update = TRUE)
-  )
-  expect_snapshot(
-    filter_ui(dat = iris, update = TRUE)
-  )
-  expect_snapshot(
-    filter_ui(dat = iris, update = TRUE, shinyjs = TRUE)
+    filter_ui(cars2, "testthat", update = T, shinyjs = T)
   )
 })
 
 test_that("that server update functions work", {
+
   # load shinjs if needed
   if (isFALSE(requireNamespace("shinyjs"))) library(shinyjs)
 
@@ -104,6 +49,7 @@ test_that("that server update functions work", {
 })
 
 test_that("server can filter", {
+
   # load shinjs if needed
   if (isFALSE(requireNamespace("shinyjs"))) library(shinyjs)
 
