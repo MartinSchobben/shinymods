@@ -1,24 +1,36 @@
 test_that("gui and update gui can be generated", {
 
   # generate gui
-   expect_snapshot(
-     filter_ui(cars2, "testthat")
-   )
+  expect_snapshot(
+    filter_controllers(cars, "testthat")
+  )
   # update gui
   expect_snapshot(
-    filter_ui(cars2, "testthat", update = T)
+    filter_controllers(cars, NULL, update = T)
   )
-
   # use shinyjs
   expect_snapshot(
-    filter_ui(cars2, "testthat", update = T, shinyjs = T)
+    filter_controllers(cars, "testthat", update = F, shinyjs = T)
+  )
+  expect_snapshot(
+    filter_controllers(cars, NULL, update = T, shinyjs = T)
+  )
+
+  expect_snapshot(
+    filter_controllers(cars, session, external =  character(0),  update = TRUE)
+  )
+})
+
+test_that("helpers work", {
+  expect_snapshot(
+    variable_names(cars)
+  )
+  expect_snapshot(
+    variable_names(cars, "speed")
   )
 })
 
 test_that("that server update functions work", {
-
-  # load shinjs if needed
-  if (isFALSE(requireNamespace("shinyjs"))) library(shinyjs)
 
   # prepare
   input <- list()
@@ -28,20 +40,33 @@ test_that("that server update functions work", {
   vars <- c("speed", "dist", "logi")
 
   # the controllers
-  hdl1 <- filter_ui(dat = cars2, update = TRUE, shinyjs = TRUE)
-  expect_snapshot(hdl1)
+  hdl1 <- filter_controllers(dat = cars2, "testthat",
+                             update = TRUE, shinyjs = TRUE)
+
+  # update gui
+  expect_snapshot(
+    hdl1
+  )
+
   # the observer event
   expect_snapshot(
     observe_builder("speed", hdl1, dat = cars2, show = TRUE)
   )
+
   # the observer event (logical)
   expect_snapshot(
     observe_builder("logi", hdl1, dat = cars2, show = TRUE)
   )
+
   # the controllers
-  hdl2 <- filter_ui(dat = cars2, external = "speed",
+  hdl2 <- filter_ui(dat = cars2, "testthat", external = "speed",
                     update = TRUE, shinyjs = TRUE)
-  expect_snapshot(hdl2)
+
+  # update gui
+  expect_snapshot(
+    hdl2
+  )
+
   # the observer event
   expect_snapshot(
     observe_builder("speed", hdl2, dat = cars2, show = TRUE)
@@ -49,9 +74,6 @@ test_that("that server update functions work", {
 })
 
 test_that("server can filter", {
-
-  # load shinjs if needed
-  if (isFALSE(requireNamespace("shinyjs"))) library(shinyjs)
 
   x <- reactiveVal()
   testServer(filter_server, args = list(dat = x, ignore = ""), {

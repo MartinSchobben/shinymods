@@ -2,33 +2,22 @@ library(shiny)
 library(shinyjs)
 library(shinymods)
 
-# ui <- fluidPage(
-#   shinyjs::useShinyjs(),
-#   sidebarLayout(
-#     sidebarPanel(
-#       filter_ui(
-#         "test",
-#         dat = cars2,
-#         labels = c("Speed", "Distribution"),
-#         logi = "Other",
-#         shinyjs = TRUE
-#       )
-#   ),
-#   mainPanel(tableOutput("table"))
-#   )
-# )
-
 ui <- fluidPage(
-        shinyjs::useShinyjs(),
         sidebarLayout(
-          sidebarPanel(filter_ui("test")),
-          mainPanel(tableOutput("table"))
+          sidebarPanel(
+            # dataset_ui("test", filter = is.data.frame),
+            filter_ui("test")
+          ),
+          mainPanel(
+            tableOutput("table")
+          )
         )
       )
 
 
 server <- function(input, output, session) {
-  ft <- filter_server("test", reactive(cars), shinyjs = TRUE)
+  # dt <- dataset_server("test")
+  ft <- filter_server(reactive(cars), "test", shinyjs = F)
   output$table <- renderTable({req(ft()); ft()})
 }
 

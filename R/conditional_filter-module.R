@@ -22,9 +22,13 @@
 #'
 #' @return Shiny module.
 #' @export
-filter_ui <- function(
+filter_ui <- function(id) {
+  uiOutput(NS(id, "ctrls"))
+}
+
+filter_controllers <- function(
     dat,
-    session,
+    id,
     labels = character(1),
     external = character(1),
     logi = character(1),
@@ -41,60 +45,69 @@ filter_ui <- function(
       call. = FALSE
     )
   }
-  # check that shinyjs is only used for the server side (update)
-  if (all(isTRUE(shinyjs), isFALSE(update))) {
-    stop(
-      "Shinyjs only work on server side and requires `update = TRUE`.",
-      call. = FALSE
-    )
-  }
+
+  # defuse
+  dat <- rlang::enquo(dat)
 
   # create automatically detected controllers
-  ctrls <- rlang::inject(
-    detect_controller(!!substitute(dat), session, labels, external, remove_na,
-                      update)
-  )
+  ctrls <- rlang::inject(detect_controller(!!dat, id, labels, external, remove_na, update))
 
   # add shinyjs switch controls
-  if (isTRUE(shinyjs)) {
-    swth <- rlang::inject(
-      switch_controller(!!substitute(dat), remove_na = remove_na)
-    )
+  if (all(isTRUE(shinyjs), isTRUE(update))) {
+    swth <- rlang::inject(switch_controller(!!dat, remove_na = remove_na))
   }
 
-  # create logical controller
-  if (!isFALSE(detect_lgl(dat, ignore, external))) {
+  # create logical controller (needs updating)
+  # if (!isFALSE(detect_lgl(dat, ignore, external))) {
+  if (FALSE) {
 
     logi <- rlang::inject(
-      logical_controller(!!substitute(dat), session, logi, external, ignore,
+      logical_controller(!!substitute(dat), id, logi, external, ignore,
                          remove_na, update)
     )
 
     # add to other controllers
     ctrls$logi <- logi
 
-    # shinyjs
-    if (isTRUE(shinyjs)) {
+    # add shinyjs switch controls (logical)
+    if (all(isTRUE(shinyjs), isTRUE(update))) {
 
-      swth_lgl <- rlang::inject(
-        switch_controller(!!substitute(dat), external= external,
-                          ignore = ignore, logical = TRUE)
-      )
+      swth_lgl <- switch_controller(dat, external= external, ignore = ignore,
+                                    logical = TRUE)
+
       # add to additional switches
       swth$logi <- swth_lgl
     }
   }
 
+  # add shinjs
+  if (all(isTRUE(shinyjs), isFALSE(update))) {
+    ctrls <- append(
+      list(rlang::call2("useShinyjs", .ns = "shinyjs")),
+      ctrls
+    )
+  }
+
   # merge controllers and switchers by name
-  purrr::list_merge(swth, !!!ctrls)
+  try(ctrls <- purrr::list_merge(swth, !!!ctrls), silent = TRUE)
+
+  ctrls
 }
 
 #' @rdname filter_ui
 #'
 #' @export
-filter_server <- function(id, dat, external = reactiveValues(),
-                          ignore = character(0), shinyjs = FALSE,
-                          remove_na = FALSE) {
+filter_server <- function(
+    dat,
+    id,
+    labels = character(1),
+    external = reactiveValues(),
+    logi = character(1),
+    ignore = character(1),
+    update = FALSE,
+    shinyjs = FALSE,
+    remove_na = FALSE
+  ) {
 
   stopifnot(is.reactive(dat))
   stopifnot(is.reactivevalues(external))
@@ -104,11 +117,19 @@ filter_server <- function(id, dat, external = reactiveValues(),
 
 
     # render the controllers
-    output$ctrl <- renderUI({
-      # original <- substitute(dat())
-      filter_controls(id = id, dat = dat(), external = names(external),
-                      ignore = ignore, shinyjs = shinyjs, remove_na = remove_na)
-    })
+    output$ctrls <- renderUI({
+
+      # prevent flickering when switching dataset
+      req(dat(), cancelOutput = TRUE)
+
+      # make controllers based on data
+      ctrls <- filter_controllers(dat(), id, labels, names(external), logi,
+                                  ignore, update, shinyjs, remove_na)
+      # create HTML
+      purrr::map(ctrls, eval)
+
+    }) |>
+      bindEvent(dat())
 
     # store input in custom `reactivalues`
     input2 <- reactiveValues()
@@ -123,6 +144,7 @@ filter_server <- function(id, dat, external = reactiveValues(),
 
     # filter observations
     obs <- reactive({
+
       purrr::map(
         c(vars(), input2$logi),
         ~filter_var(dat()[[.x]], input2[[.x]], remove_na = remove_na)
@@ -130,30 +152,40 @@ filter_server <- function(id, dat, external = reactiveValues(),
         purrr::reduce(`&`)
     })
 
-    # return data
+    # return filtered data
     filter <- reactive({
+
+      # this requires a vector of length > 0
+      req(obs())
+
+
       dat()[obs(), , drop = FALSE]
     })
 
     # update the controllers to match the new data ranges
-    observeEvent(filter(), {
-      hdl <- filter_controls(dat = filter(), external = names(external),
-                             update = TRUE, session = session,
-                             ignore = ignore, shinyjs = shinyjs,
-                             remove_na = remove_na)
+    observeEvent(dat(), {
+
+      # prevent flickering when switching dataset
+      req(filter())
+
+      # update controls
+      ctrls <- filter_controllers(filter(), session, labels, names(external), logi,
+                                  ignore, update = TRUE, shinyjs, remove_na)
+
       # if logical variables exist "logi" is appended
-      if (length(logi_cols(filter(), names(external), ignore)) > 0) {
+      if (detect_lgl(filter(), names(external), ignore)) {
         vars <- c(vars(), "logi")
       } else {
         vars <- vars()
       }
-      purrr::walk(vars, ~observe_builder(.x, y = hdl, dat = filter()))
-    },
-    once = TRUE
-    )
+
+      # execute
+      purrr::walk(vars, ~observe_builder(.x, y = ctrls, dat = filter()))
+    })
 
     # return only non-logical column vars
     reactive({filter()[, col_spec(filter()) != "logical", drop = FALSE]})
+
   })
 }
 
@@ -161,12 +193,19 @@ filter_server <- function(id, dat, external = reactiveValues(),
 # helper functions
 #-------------------------------------------------------------------------------
 
+# reactive value names for input
+variable_names <- function(dat, ignore = character(1)) {
+  # no logical columns
+  nms <- names(col_spec(dat))[col_spec(dat) != "logical"]
+  # discard ignored columns
+  nms[!nms %in% ignore]
+}
 
 # filter operation on the dataset based on variable class
 filter_var <- function(x, val = NULL, remove_na = FALSE) {
 
-  # # shortcut with val `NULL`
-  if (all(is.null(x), is.null(val)))  return(TRUE)
+  # shortcut with val `NULL` or other none Truthy vals
+  if (all(!isTruthy(x), !isTruthy(val)))  return(TRUE)
 
   if (is.numeric(x)) {
     y <- x >= val[1] & x <= val[2]
@@ -189,24 +228,33 @@ observe_builder <- function(x, y, dat, show = FALSE) {
 
   # event
   evt <- rlang::call2("$", rlang::sym("input2"), x)
+
   # original data
   dt <- rlang::enexpr(dat)
-  org <- rlang::call2("$", rlang::expr(!!dt), x)
+  org <- rlang::call2("$", dt, x)
 
   # exit by `req` validation of filter operation
   if (x == "logi") {
+
     # logical columns available
-    filter_cols <- rlang::call2(
-      "logi_cols",
-      rlang::parse_expr(paste0(dt, "()")),
+    filter <- rlang::call2(
+      "detect_lgl",
+      dt,
       external = rlang::sym("external"),
       ignore = rlang::sym("ignore")
-      )
-    filter <- rlang::expr(length(!!filter_cols) > 0)
+    )
+
+    # filter <- rlang::expr(length(!!filter_cols) > 0)
+
   } else {
+
     # levels or ranges in variables available
-    filter <- rlang::expr(any(!!rlang::call2("filter_var", org , evt, remove_na = FALSE)))
+    filter <- rlang::expr(
+      any(!!rlang::call2("filter_var", org , evt, remove_na = FALSE))
+    )
+
   }
+
   exit <- rlang::call2("req", filter, cancelOutput = TRUE)
 
   # combine handle
@@ -214,13 +262,16 @@ observe_builder <- function(x, y, dat, show = FALSE) {
 
   # for debugging purposes also enable viewing the `observeEvent` expression
   if (isTRUE(show)) {
+
     rlang::call2(
       "observeEvent",
       eventExpr = evt,
       handlerExpr = rlang::expr({!!!xprs}),
       .ns = "shiny"
-      )
+    )
+
   } else {
+
     shiny::observeEvent(
       eventExpr = evt,
       handlerExpr = rlang::expr({!!!xprs}),
@@ -230,6 +281,7 @@ observe_builder <- function(x, y, dat, show = FALSE) {
       handler.quoted = TRUE,
       ignoreInit = TRUE
     )
+
   }
 }
 

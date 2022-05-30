@@ -25,20 +25,30 @@ detect_controller <- function(
     update = FALSE
     ) {
 
-  st <- function(x, y, label) {
-    # reconstruct original dataframe subset
-    dt <- rlang::parse_expr(paste0(deparse(sys.call(1)[[2]]), "$", y))
+  # defuse
+  dat <- rlang::enquo(dat)
+
+  st <- function(var, label) {
+
+    # reconstruct original dataframe subset call
+    dt <- rlang::call2("$", rlang::quo_get_expr(dat), rlang::parse_expr(var))
+
+    # make new quo
+    dt <- rlang::new_quosure(dt, env = rlang::quo_get_env(dat))
+
     # execute
-    rlang::inject(detect_controller_(!!dt, session, label, remove_na, update))
+    detect_controller_(dt, session, label, remove_na, update)
   }
 
+  # original names columns
+  nms <- names(rlang::eval_tidy(dat))
   # augment labels in case of logical columns
-  labels <- ifelse(names(dat) %in% names(labels), labels, names(dat))
+  labels <- ifelse(nms %in% names(labels), labels, nms)
 
   # vectorize gui controller build
-  ctrls <- rlang::inject(
-    purrr::pmap(list(!!substitute(dat), names(!!substitute(dat)), labels), st)
-  ) |>
+  ctrls <- purrr::map2(nms, labels, st) |>
+    # set names
+    rlang::set_names(nms) |>
     # remove empty controllers
     purrr::compact()
 
@@ -46,15 +56,20 @@ detect_controller <- function(
   ctrls[!names(ctrls) %in% external]
 }
 
+# col = qusoure
 detect_controller_ <- function(col, session, label, remove_na = FALSE,
                                update = FALSE) {
 
-  # save expression
-  col <- rlang::enexpr(col)
   # inject preserve expression
-  args <- rlang::inject(col_vals(!!col, remove_na))
+  args <- col_vals(
+    rlang::eval_tidy(col),
+    rlang::quo_get_expr(col),
+    rlang::quo_get_env(col),
+    remove_na,
+    update
+  )
   # make id
-  id <- gsub("(.)*\\$", "", deparse(substitute(col)))
+  id <- gsub("(.)*\\$", "", rlang::as_label(col))
   # label
   if (label == "") label <- id
 
@@ -64,10 +79,13 @@ detect_controller_ <- function(col, session, label, remove_na = FALSE,
     substring(args[[1]], 1) <- toupper(substring(args[[1]], 1, 1))
     args[[1]] <- paste0("update", args[[1]])
     # add session and id
-    args[[2]] <- append(c(session = session, inputID = id), args[[2]])
+    args[[2]] <- append(c(session = session, inputId = id), args[[2]])
   } else {
     # add id and optional label
-    args[[2]] <- append(c(inputID = NS(session, id), label = label), args[[2]])
+    args[[2]] <- append(
+      c(inputId = NS(session, id), label = label),
+      args[[2]]
+    )
   }
 
   # make controller
@@ -90,9 +108,18 @@ logical_controller <- function(
     stop("Only vectors `labels` of length one are accepted.", call. = FALSE)
   }
 
+  # defuse
+  dat <- rlang::enquo(dat)
+
   # make the call for obtaining logical values
-  call_detect_lgl <- rlang::call2("detect_lgl", substitute(dat),
-                                 ignore = ignore, external = external)
+  detect_lgl <- rlang::call2("detect_lgl", rlang::quo_get_expr(dat),
+                             ignore = ignore, external = external)
+
+  # eval if update
+  if (isFALSE(update)) {
+    detect_lgl <- rlang::eval_tidy(detect_lgl , env =rlang::quo_get_env(dat))
+  }
+
   # make the isolate call
   logi_iso <- rlang::call2("isolate", rlang::expr(input$logi), .ns = "shiny")
 
@@ -107,17 +134,20 @@ logical_controller <- function(
     session  = if (isTRUE(update)) session else NULL,
     inputId = if (isTRUE(update)) "logi" else NS(session, "logi"),
     label =  labels,
-    choices = call_detect_lgl,
+    choices = detect_lgl,
     selected = if (isTRUE(update)) logi_iso else NULL,
     multiple = if (isTRUE(update))  NULL else TRUE,
     options = if (isTRUE(update)) NULL else js_lgl
   ) |>
-  # remove empyt elements
+  # remove empty elements
     purrr::compact()
 
   # make controller
   if (isTRUE(update)) sh <-  "updateSelectizeInput" else sh <- "selectizeInput"
+
+  # make logi controller
   rlang::call2(sh, !!!logi)
+
 }
 #' @rdname detect_controller
 #'
@@ -132,24 +162,33 @@ switch_controller <- function(
     logical = FALSE
   ) {
 
+  # defuse
+  dat <- rlang::enquo(dat)
+
+  # shinyjs for logical columns
   if (isTRUE(logical)) {
+
     cl <- rlang::call2("detect_lgl", substitute(dat), ignore = ignore,
                        external = external)
     ctrls <- switch_controller_(cl, method, val)
 
+  # shinjs for other columns types
   } else {
 
-  st <- function(dat, nm) {
-    # reconstruct original dataframe subset
-    dt <- rlang::parse_expr(paste0(deparse(sys.call(1)[[2]]), "$", nm))
+  st <- function(var) {
+    # reconstruct original dataframe subset call
+    dt <- rlang::call2("$", rlang::quo_get_expr(dat), var)
     # execute
     rlang::inject(switch_controller_(!!dt, method, val))
   }
 
+  # original names columns
+  nms <- names(rlang::eval_tidy(dat))
+
   # vectorize gui controller build
-  ctrls <- rlang::inject(
-    purrr::pmap(list(!!substitute(dat), names(!!substitute(dat))), st)
-  ) |>
+  ctrls <- purrr::map(nms, st) |>
+    # set names
+    rlang::set_names(nms) |>
     # remove empty controllers
     purrr::compact()
   }
@@ -176,7 +215,6 @@ switch_controller_ <- function(col, method = "length", val = 1,
     return(NULL)
   }
 
-
   # function to use
   fun <- deparse1(rlang::call2(method, x), collapse = " ")
   # condition for switch
@@ -193,24 +231,24 @@ switch_controller_ <- function(col, method = "length", val = 1,
 #'
 #' @return List containing the ingredients to build a Shiny controller.
 #' @export
-col_vals <- function(col, remove_na = FALSE) {
+col_vals <- function(col, expr, env, remove_na = FALSE, update = FALSE) {
 
   UseMethod("col_vals")
 }
 #' @rdname col_vals
 #'
 #' @export
-col_vals.numeric <- function(col, remove_na = FALSE) {
-
-  # quote col
-  col <- substitute(col)
+col_vals.numeric <- function(col, expr, env, remove_na = FALSE, update = FALSE) {
 
   # body of arguments
   vls <- rlang::exprs(
-    min = !!detect_rng("min", col, na.rm = TRUE),
-    max = !!detect_rng("max", col, na.rm = TRUE),
-    value = !!detect_rng("range", col, na.rm = TRUE)
+    min = !!detect_rng("min", expr, na.rm = TRUE),
+    max = !!detect_rng("max", expr, na.rm = TRUE),
+    value = !!detect_rng("range", expr, na.rm = TRUE)
   )
+
+  # eval if update
+  if (isFALSE(update)) vls <- purrr::map(vls, rlang::eval_tidy, env = env)
 
   # shiny controller
   cnr <- "sliderInput"
@@ -221,17 +259,17 @@ col_vals.numeric <- function(col, remove_na = FALSE) {
 #' @rdname detect_controller
 #'
 #' @export
-col_vals.character <- function(col, remove_na = FALSE) {
-
-  # quote col
-  col <- substitute(col)
+col_vals.character <- function(col, expr, env, remove_na = FALSE, update = FALSE) {
 
   # body of arguments
   vls <- rlang::exprs(
-    choices = !!detect_lvls(col, remove_na = remove_na),
-    selected = !!detect_lvls(col, remove_na = remove_na),
+    choices = !!detect_lvls(expr, remove_na = remove_na),
+    selected = !!detect_lvls(expr, remove_na = remove_na),
     multiple = TRUE
   )
+
+  # eval if update
+  if (isFALSE(update)) vls <- purrr::map(vls, rlang::eval_tidy, env = env)
 
   # shiny controller
   cnr <- "selectInput"
@@ -246,7 +284,7 @@ col_vals.factor <- col_vals.character
 #' @rdname detect_controller
 #'
 #' @export
-col_vals.logical <- function(col, remove_na = FALSE) NULL
+col_vals.logical <- function(col, expr, env, remove_na = FALSE, update = FALSE)NULL
 
 #-------------------------------------------------------------------------------
 # helper functions
@@ -284,5 +322,5 @@ col_spec <- function(dat, external = character(1), ignore = character(1)) {
   dat <- dat[, !(names(dat) %in% c(external, ignore)), drop = FALSE]
 
   # class of each column
-  vapply(dat, class, character(1))
+  vapply(dat, function(x) utils::tail(class(x), 1), character(1))
 }

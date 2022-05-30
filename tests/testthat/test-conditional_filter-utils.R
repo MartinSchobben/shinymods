@@ -2,11 +2,11 @@ test_that("col_vals works", {
 
   # numeric
   expect_snapshot(
-    col_vals(cars$speed)
+    col_vals(cars$speed, rlang::expr(cars$speed), .GlobalEnv)
   )
   # character
   expect_snapshot(
-    col_vals(iris$Species)
+    col_vals(iris$Species, rlang::expr(iris$Species), .GlobalEnv)
   )
   # logical
   expect_equal(
@@ -21,15 +21,20 @@ test_that("detect_controller works", {
   expect_snapshot(
     detect_controller(cars, "testthat")
   )
+  # standard (reactive like)
+  `testdata()` <- cars
+  expect_snapshot(
+    detect_controller(`testdata()`, "testthat")
+  )
   expect_snapshot(
     detect_controller(iris, "testthat")
   )
   # update
   expect_snapshot(
-    detect_controller(cars, "testthat", update = T)
+    detect_controller(cars, NULL, update = T)
   )
   expect_snapshot(
-    detect_controller(iris, "testthat", update = T)
+    detect_controller(iris, NULL, update = T)
   )
   # custom labels
   expect_snapshot(
@@ -81,5 +86,8 @@ test_that("helpers work", {
   )
   expect_snapshot(
     col_spec(cars2)
+  )
+  expect_snapshot(
+    col_spec(DNase)
   )
 })
