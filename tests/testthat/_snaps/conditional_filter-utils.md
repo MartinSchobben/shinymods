@@ -28,10 +28,12 @@
       
       [[2]]
       [[2]]$choices
-      [1] "setosa"     "versicolor" "virginica" 
+      [1] setosa     versicolor virginica 
+      Levels: setosa versicolor virginica
       
       [[2]]$selected
-      [1] "setosa"     "versicolor" "virginica" 
+      [1] setosa     versicolor virginica 
+      Levels: setosa versicolor virginica
       
       [[2]]$multiple
       [1] TRUE
@@ -41,7 +43,7 @@
 # detect_controller works
 
     Code
-      detect_controller(cars, "testthat")
+      detect_controller(cars, session)
     Output
       $speed
       sliderInput(inputId = "testthat-speed", label = "speed", min = 4, 
@@ -55,7 +57,7 @@
 ---
 
     Code
-      detect_controller(`testdata()`, "testthat")
+      detect_controller(`testdata()`, session)
     Output
       $speed
       sliderInput(inputId = "testthat-speed", label = "speed", min = 4, 
@@ -69,7 +71,7 @@
 ---
 
     Code
-      detect_controller(iris, "testthat")
+      detect_controller(iris, session)
     Output
       $Sepal.Length
       sliderInput(inputId = "testthat-Sepal.Length", label = "Sepal.Length", 
@@ -89,60 +91,53 @@
       
       $Species
       selectInput(inputId = "testthat-Species", label = "Species", 
-          choices = c("setosa", "versicolor", "virginica"), selected = c("setosa", 
-          "versicolor", "virginica"), multiple = TRUE)
+          choices = 1:3, selected = 1:3, multiple = TRUE)
       
 
 ---
 
     Code
-      detect_controller(cars, NULL, update = T)
+      detect_controller(cars, session, update = T)
     Output
       $speed
-      updateSliderInput(inputId = "speed", min = min(cars$speed, na.rm = TRUE), 
-          max = max(cars$speed, na.rm = TRUE), value = range(cars$speed, 
-              na.rm = TRUE))
+      updateSliderInput(session = <environment>, inputId = "speed", 
+          value = range(cars$speed, na.rm = TRUE))
       
       $dist
-      updateSliderInput(inputId = "dist", min = min(cars$dist, na.rm = TRUE), 
-          max = max(cars$dist, na.rm = TRUE), value = range(cars$dist, 
-              na.rm = TRUE))
+      updateSliderInput(session = <environment>, inputId = "dist", 
+          value = range(cars$dist, na.rm = TRUE))
       
 
 ---
 
     Code
-      detect_controller(iris, NULL, update = T)
+      detect_controller(iris, session, update = T)
     Output
       $Sepal.Length
-      updateSliderInput(inputId = "Sepal.Length", min = min(iris$Sepal.Length, 
-          na.rm = TRUE), max = max(iris$Sepal.Length, na.rm = TRUE), 
+      updateSliderInput(session = <environment>, inputId = "Sepal.Length", 
           value = range(iris$Sepal.Length, na.rm = TRUE))
       
       $Sepal.Width
-      updateSliderInput(inputId = "Sepal.Width", min = min(iris$Sepal.Width, 
-          na.rm = TRUE), max = max(iris$Sepal.Width, na.rm = TRUE), 
+      updateSliderInput(session = <environment>, inputId = "Sepal.Width", 
           value = range(iris$Sepal.Width, na.rm = TRUE))
       
       $Petal.Length
-      updateSliderInput(inputId = "Petal.Length", min = min(iris$Petal.Length, 
-          na.rm = TRUE), max = max(iris$Petal.Length, na.rm = TRUE), 
+      updateSliderInput(session = <environment>, inputId = "Petal.Length", 
           value = range(iris$Petal.Length, na.rm = TRUE))
       
       $Petal.Width
-      updateSliderInput(inputId = "Petal.Width", min = min(iris$Petal.Width, 
-          na.rm = TRUE), max = max(iris$Petal.Width, na.rm = TRUE), 
+      updateSliderInput(session = <environment>, inputId = "Petal.Width", 
           value = range(iris$Petal.Width, na.rm = TRUE))
       
       $Species
-      updateSelectInput(inputId = "Species", choices = levels(as.factor(iris$Species)), 
-          selected = levels(as.factor(iris$Species)), multiple = TRUE)
+      updateSelectInput(session = <environment>, inputId = "Species", 
+          selected = unique(as.factor(iris$Species)))
       
 
 ---
 
     Code
-      detect_controller(cars2, "testthat", c(speed = "a", dist = "b"))
+      detect_controller(cars2, session, c(speed = "a", dist = "b"))
     Output
       $speed
       sliderInput(inputId = "testthat-speed", label = "b", min = 4, 
@@ -156,7 +151,7 @@
 ---
 
     Code
-      detect_controller(iris, "testthat", external = "Species")
+      detect_controller(iris, session, external = "Species")
     Output
       $Sepal.Length
       sliderInput(inputId = "testthat-Sepal.Length", label = "Sepal.Length", 
@@ -178,7 +173,7 @@
 # logical_controller works
 
     Code
-      logical_controller(cars2, "testthat")
+      logical_controller(cars2, session)
     Output
       selectizeInput(inputId = "testthat-logi", label = "Various", 
           choices = c("high_speed", "high_dist"), multiple = TRUE, 
@@ -187,7 +182,7 @@
 ---
 
     Code
-      logical_controller(cars2, "testthat", labels = "a")
+      logical_controller(cars2, session, labels = "a")
     Output
       selectizeInput(inputId = "testthat-logi", label = "a", choices = c("high_speed", 
       "high_dist"), multiple = TRUE, options = list(placeholder = "select", 
@@ -196,9 +191,9 @@
 ---
 
     Code
-      logical_controller(cars2, "testthat", labels = "a", update = TRUE)
+      logical_controller(cars2, session, labels = "a", update = TRUE)
     Output
-      updateSelectizeInput(session = "testthat", inputId = "logi", 
+      updateSelectizeInput(session = <environment>, inputId = "logi", 
           label = "a", choices = detect_lgl(cars2, ignore = "", external = ""), 
           selected = shiny::isolate(input$logi))
 
@@ -236,7 +231,7 @@
           1)
       
       $Species
-      shinyjs::toggleState("Species", length(levels(as.factor(iris$Species))) > 
+      shinyjs::toggleState("Species", length(unique(as.factor(iris$Species))) > 
           1)
       
 
@@ -263,4 +258,12 @@
     Output
       high_speed      speed       dist  high_dist 
        "logical"  "numeric"  "numeric"  "logical" 
+
+---
+
+    Code
+      col_spec(DNase)
+    Output
+            Run      conc   density 
+       "factor" "numeric" "numeric" 
 

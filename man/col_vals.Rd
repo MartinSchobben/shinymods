@@ -3,16 +3,32 @@
 \name{col_vals}
 \alias{col_vals}
 \alias{col_vals.numeric}
+\alias{col_vals.character}
+\alias{col_vals.factor}
+\alias{col_vals.logical}
 \title{Base filter method based on the class of column}
 \usage{
-col_vals(col, remove_na = FALSE)
+col_vals(col, expr, env, remove_na = FALSE, update = FALSE)
 
-\method{col_vals}{numeric}(col, remove_na = FALSE)
+\method{col_vals}{numeric}(col, expr, env, remove_na = FALSE, update = FALSE)
+
+\method{col_vals}{character}(col, expr, env, remove_na = FALSE, update = FALSE)
+
+\method{col_vals}{factor}(col, expr, env, remove_na = FALSE, update = FALSE)
+
+\method{col_vals}{logical}(col, expr, env, remove_na = FALSE, update = FALSE)
 }
 \arguments{
-\item{col}{Column}
+\item{col}{Column of a dataframe.}
 
-\item{remove_na}{Remove NA's}
+\item{expr}{The expression of param \code{col}.}
+
+\item{env}{The original environment of param \code{col}.}
+
+\item{remove_na}{Remove NA's.}
+
+\item{update}{Logical indicating whether ui controllers are ui- or
+server-side for updating the controllers ranges.}
 }
 \value{
 List containing the ingredients to build a Shiny controller.

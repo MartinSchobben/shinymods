@@ -7,3 +7,6 @@ if (interactive()) {
 options(renv.settings.snapshot.type = "explicit")
 source("renv/activate.R")
 
+# R sources files
+file.symlink("R/", "inst/src/R")
+

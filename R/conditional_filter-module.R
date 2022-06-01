@@ -4,13 +4,10 @@
 #' the data range.
 #'
 #' @param id Namespace of the module.
-#' @param dat The data supplied as `dataframe` or tibble.
+#' @param dat The data supplied as `dataframe` or `tibble`.
 #' @param labels Labels for the controllers (defaults to the variable names).
 #' @param logi Label for the controller of logical variables (defaults to
-#'  `"Various"`.
-#' @param update Logical indicating whether ui controllers are ui- or
-#'  server-side for updating the controllers ranges.
-#' @param session The shiny session domain.
+#'  `"Various"`).
 #' @param shinyjs A logical indicating whether shinyjs `ToggleState()` is
 #'  included to disable controllers.
 #' @param external `reactiveValues` assigning external filter variables to the
@@ -25,75 +22,6 @@
 filter_ui <- function(id) {
   uiOutput(NS(id, "ctrls"))
 }
-
-filter_controllers <- function(
-    dat,
-    id,
-    labels = character(1),
-    external = character(1),
-    logi = character(1),
-    ignore = character(1),
-    update = FALSE,
-    shinyjs = FALSE,
-    remove_na = FALSE
-  ) {
-
-  # check for shinyjs
-  if (all(isTRUE(shinyjs), !requireNamespace("shinyjs", quietly = TRUE))) {
-    stop(
-      "Package \"shinyjs\" must be installed to use this function.",
-      call. = FALSE
-    )
-  }
-
-  # defuse
-  dat <- rlang::enquo(dat)
-
-  # create automatically detected controllers
-  ctrls <- rlang::inject(detect_controller(!!dat, id, labels, external, remove_na, update))
-
-  # add shinyjs switch controls
-  if (all(isTRUE(shinyjs), isTRUE(update))) {
-    swth <- rlang::inject(switch_controller(!!dat, remove_na = remove_na))
-  }
-
-  # create logical controller (needs updating)
-  # if (!isFALSE(detect_lgl(dat, ignore, external))) {
-  if (FALSE) {
-
-    logi <- rlang::inject(
-      logical_controller(!!substitute(dat), id, logi, external, ignore,
-                         remove_na, update)
-    )
-
-    # add to other controllers
-    ctrls$logi <- logi
-
-    # add shinyjs switch controls (logical)
-    if (all(isTRUE(shinyjs), isTRUE(update))) {
-
-      swth_lgl <- switch_controller(dat, external= external, ignore = ignore,
-                                    logical = TRUE)
-
-      # add to additional switches
-      swth$logi <- swth_lgl
-    }
-  }
-
-  # add shinjs
-  if (all(isTRUE(shinyjs), isFALSE(update))) {
-    ctrls <- append(
-      list(rlang::call2("useShinyjs", .ns = "shinyjs")),
-      ctrls
-    )
-  }
-
-  # merge controllers and switchers by name
-  try(ctrls <- purrr::list_merge(swth, !!!ctrls), silent = TRUE)
-
-  ctrls
-}
-
 #' @rdname filter_ui
 #'
 #' @export
@@ -104,14 +32,13 @@ filter_server <- function(
     external = reactiveValues(),
     logi = character(1),
     ignore = character(1),
-    update = FALSE,
     shinyjs = FALSE,
     remove_na = FALSE
   ) {
 
   stopifnot(is.reactive(dat))
   stopifnot(is.reactivevalues(external))
-  stopifnot(is.character(ignore))
+  stopifnot(vapply(list(labels, logi, ignore), is.character, logical(1)))
 
   moduleServer(id, function(input, output, session) {
 
@@ -120,11 +47,11 @@ filter_server <- function(
     output$ctrls <- renderUI({
 
       # prevent flickering when switching dataset
-      req(dat(), cancelOutput = TRUE)
+      req(dat())
 
-      # make controllers based on data
-      ctrls <- filter_controllers(dat(), id, labels, names(external), logi,
-                                  ignore, update, shinyjs, remove_na)
+      # make controllers based on data (be explicit with update argument)
+      ctrls <- filter_controllers(dat(), session, labels, names(external), logi,
+                                  ignore, update = FALSE, shinyjs, remove_na)
       # create HTML
       purrr::map(ctrls, eval)
 
@@ -154,23 +81,16 @@ filter_server <- function(
 
     # return filtered data
     filter <- reactive({
-
-      # this requires a vector of length > 0
-      req(obs())
-
-
       dat()[obs(), , drop = FALSE]
     })
 
     # update the controllers to match the new data ranges
-    observeEvent(dat(), {
-
-      # prevent flickering when switching dataset
-      req(filter())
+    observeEvent(filter(), {
 
       # update controls
-      ctrls <- filter_controllers(filter(), session, labels, names(external), logi,
-                                  ignore, update = TRUE, shinyjs, remove_na)
+      ctrls <- filter_controllers(filter(), session, labels, names(external),
+                                  logi, ignore, update = TRUE, shinyjs,
+                                  remove_na)
 
       # if logical variables exist "logi" is appended
       if (detect_lgl(filter(), names(external), ignore)) {
@@ -193,6 +113,77 @@ filter_server <- function(
 # helper functions
 #-------------------------------------------------------------------------------
 
+# build controllers based on data
+filter_controllers <- function(
+    dat,
+    session,
+    labels = character(1),
+    external = character(1),
+    logi = character(1),
+    ignore = character(1),
+    update = FALSE,
+    shinyjs = FALSE,
+    remove_na = FALSE
+) {
+
+  # check for shinyjs
+  if (all(isTRUE(shinyjs), !requireNamespace("shinyjs", quietly = TRUE))) {
+    stop(
+      "Package \"shinyjs\" must be installed to use this function.",
+      call. = FALSE
+    )
+  }
+
+  # defuse
+  dat <- rlang::enquo(dat)
+
+  # create automatically detected controllers
+  ctrls <- rlang::inject(detect_controller(!!dat, session, labels, external,
+                                           remove_na, update))
+
+  # add shinyjs switch controls
+  if (all(isTRUE(shinyjs), isTRUE(update))) {
+    swth <- rlang::inject(switch_controller(!!dat, remove_na = remove_na))
+  }
+
+  # create logical controller (needs updating)
+  if (!isFALSE(detect_lgl(rlang::eval_tidy(dat), ignore, external))) {
+
+    logi <- rlang::inject(
+      logical_controller(!!substitute(dat), session, logi, external, ignore,
+                         remove_na, update)
+    )
+
+    # add to other controllers
+    ctrls$logi <- logi
+
+    # add shinyjs switch controls (logical)
+    if (all(isTRUE(shinyjs), isTRUE(update))) {
+
+      swth_lgl <- rlang::inject(
+        switch_controller(!!dat, external = external, ignore = ignore,
+                          logical = TRUE)
+      )
+
+      # add to additional switches
+      swth$logi <- swth_lgl
+    }
+  }
+
+  # add shinjs
+  if (all(isTRUE(shinyjs), isFALSE(update))) {
+    ctrls <- append(
+      list(rlang::call2("useShinyjs", .ns = "shinyjs")),
+      ctrls
+    )
+  }
+
+  # merge controllers and switchers by name
+  try(ctrls <- purrr::list_merge(swth, !!!ctrls), silent = TRUE)
+
+  ctrls
+}
+
 # reactive value names for input
 variable_names <- function(dat, ignore = character(1)) {
   # no logical columns
@@ -205,7 +196,7 @@ variable_names <- function(dat, ignore = character(1)) {
 filter_var <- function(x, val = NULL, remove_na = FALSE) {
 
   # shortcut with val `NULL` or other none Truthy vals
-  if (all(!isTruthy(x), !isTruthy(val)))  return(TRUE)
+  # if (all(!isTruthy(x), !isTruthy(val)))  return(TRUE)
 
   if (is.numeric(x)) {
     y <- x >= val[1] & x <= val[2]

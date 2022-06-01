@@ -4,14 +4,11 @@
 \alias{detect_controller}
 \alias{logical_controller}
 \alias{switch_controller}
-\alias{col_vals.character}
-\alias{col_vals.factor}
-\alias{col_vals.logical}
 \title{Build a controller based on data}
 \usage{
 detect_controller(
   dat,
-  session,
+  session = getDefaultReactiveDomain(),
   labels = character(1),
   external = character(1),
   remove_na = FALSE,
@@ -28,18 +25,20 @@ logical_controller(
   update = FALSE
 )
 
-switch_controller(col, x, method, val)
-
-\method{col_vals}{character}(col, remove_na = FALSE)
-
-\method{col_vals}{factor}(col, remove_na = FALSE)
-
-\method{col_vals}{logical}(col, remove_na = FALSE)
+switch_controller(
+  dat,
+  method = "length",
+  val = 1,
+  external = character(1),
+  ignore = character(1),
+  remove_na = FALSE,
+  logical = FALSE
+)
 }
 \arguments{
-\item{dat}{The data supplied as \code{dataframe} or tibble.}
+\item{dat}{The data supplied as \code{dataframe} or \code{tibble}.}
 
-\item{session}{Namespace of the module or session.}
+\item{session}{Shiny session object.}
 
 \item{labels}{Labels for the controllers (defaults to the variable names).
 Must be a named vector where the names refer to the names of the original
@@ -56,6 +55,15 @@ server-side for updating the controllers ranges.}
 
 \item{ignore}{Character string/vector for variables to be ignored for
 filtering of the dataset.}
+
+\item{method}{Method to use for switch_controller condition (defaults to
+\code{length}).}
+
+\item{val}{Value to use for switch_controller condition (defaults to
+\code{1})}
+
+\item{logical}{Boolean to determine whether the switch_controller is
+constructed for logical values.}
 }
 \value{
 Shiny controller call.

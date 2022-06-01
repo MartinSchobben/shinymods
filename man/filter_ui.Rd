@@ -5,31 +5,23 @@
 \alias{filter_server}
 \title{Conditional filter module}
 \usage{
-filter_ui(
-  dat,
-  session,
-  labels = character(1),
-  external = character(1),
-  logi = character(1),
-  update = FALSE,
-  shinyjs = FALSE,
-  ignore = NULL,
-  remove_na = FALSE
-)
+filter_ui(id)
 
 filter_server(
-  id,
   dat,
+  id,
+  labels = character(1),
   external = reactiveValues(),
-  ignore = character(0),
+  logi = character(1),
+  ignore = character(1),
   shinyjs = FALSE,
   remove_na = FALSE
 )
 }
 \arguments{
-\item{dat}{The data supplied as \code{dataframe} or tibble.}
+\item{id}{Namespace of the module.}
 
-\item{session}{The shiny session domain.}
+\item{dat}{The data supplied as \code{dataframe} or \code{tibble}.}
 
 \item{labels}{Labels for the controllers (defaults to the variable names).}
 
@@ -37,21 +29,16 @@ filter_server(
 module.}
 
 \item{logi}{Label for the controller of logical variables (defaults to
-\code{"Various"}.}
-
-\item{update}{Logical indicating whether ui controllers are ui- or
-server-side for updating the controllers ranges.}
-
-\item{shinyjs}{A logical indicating whether shinyjs \code{ToggleState()} is
-included to disable controllers.}
+\code{"Various"}).}
 
 \item{ignore}{Character string/vector for variables to be ignored for
 filtering of the dataset.}
 
+\item{shinyjs}{A logical indicating whether shinyjs \code{ToggleState()} is
+included to disable controllers.}
+
 \item{remove_na}{Logical indicating whether NAs should be removed during
 filtering (defaults to FALSE).}
-
-\item{id}{Namespace of the module.}
 }
 \value{
 Shiny module.

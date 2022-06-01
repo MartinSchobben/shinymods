@@ -7,13 +7,14 @@
 \usage{
 wizard_ui(id, tabs)
 
-wizard_server(id, tabs)
+wizard_server(id, n)
 }
 \arguments{
 \item{id}{Namespace of the module.}
 
-\item{tabs}{\code{Taglist} with elements to be included within the tabs. The
-number of elements determines the number of slides in the wizard.}
+\item{tabs}{\code{Taglist} with elements to be included within the tabs.}
+
+\item{n}{The number of slides in the wizard.}
 }
 \description{
 The module creates a wizard that takes you through a selection of slides.

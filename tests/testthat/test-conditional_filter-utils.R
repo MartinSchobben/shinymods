@@ -17,49 +17,55 @@ test_that("col_vals works", {
 
 test_that("detect_controller works", {
 
+  session <- environment()
+  session$ns <- NS("testthat")
+
   # standard
   expect_snapshot(
-    detect_controller(cars, "testthat")
+    detect_controller(cars, session)
   )
   # standard (reactive like)
   `testdata()` <- cars
   expect_snapshot(
-    detect_controller(`testdata()`, "testthat")
+    detect_controller(`testdata()`, session)
   )
   expect_snapshot(
-    detect_controller(iris, "testthat")
+    detect_controller(iris, session)
   )
   # update
   expect_snapshot(
-    detect_controller(cars, NULL, update = T)
+    detect_controller(cars, session, update = T)
   )
   expect_snapshot(
-    detect_controller(iris, NULL, update = T)
+    detect_controller(iris, session, update = T)
   )
   # custom labels
   expect_snapshot(
-    detect_controller(cars2, "testthat", c(speed = "a", dist = "b"))
+    detect_controller(cars2, session, c(speed = "a", dist = "b"))
   )
   # remove external controllers
   expect_snapshot(
-    detect_controller(iris, "testthat", external = "Species")
+    detect_controller(iris, session, external = "Species")
   )
 
 })
 
 test_that("logical_controller works", {
 
+  session <- environment()
+  session$ns <- NS("testthat")
+
   # standard
   expect_snapshot(
-    logical_controller(cars2, "testthat")
+    logical_controller(cars2, session)
   )
   # custom label
   expect_snapshot(
-    logical_controller(cars2, "testthat", labels = "a")
+    logical_controller(cars2, session, labels = "a")
   )
   # update
   expect_snapshot(
-    logical_controller(cars2, "testthat", labels = "a", update = TRUE)
+    logical_controller(cars2, session, labels = "a", update = TRUE)
   )
 })
 

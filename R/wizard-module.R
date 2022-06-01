@@ -3,8 +3,8 @@
 #' The module creates a wizard that takes you through a selection of slides.
 #'
 #' @param id Namespace of the module.
-#' @param tabs `Taglist` with elements to be included within the tabs. The
-#'  number of elements determines the number of slides in the wizard.
+#' @param tabs `Taglist` with elements to be included within the tabs.
+#' @param n The number of slides in the wizard.
 #'
 #' @export
 wizard_ui <- function(id, tabs) {
@@ -22,7 +22,7 @@ wizard_ui <- function(id, tabs) {
 #' @rdname wizard_ui
 #'
 #' @export
-wizard_server <- function(id, tabs) {
+wizard_server <- function(id, n) {
 
   moduleServer(id, function(input, output, session) {
 
@@ -33,35 +33,56 @@ wizard_server <- function(id, tabs) {
       })
     }
 
-  # go forward
-  purrr::map(seq_len(length(tabs))[-1], ~switch_tab(.x, .x - 1))
+    # go forward
+    purrr::map(seq_len(n)[-1], ~switch_tab(.x, .x - 1))
 
-  # go back
-  purrr::map(seq_len(length(tabs))[-length(tabs)], ~switch_tab(.x, .x + 1))
+    # go back
+    purrr::map(seq_len(n)[-n], ~switch_tab(.x, .x + 1))
 
   })
 }
 
+# function to put content into tab with buttons and navbar like lower border
 tab_creator <- function(id, tabs) {
 
   range <- seq_along(tabs)
 
   # function to populate tab pane with buttons
   tab_buttons <- function(a, b, c, tab, title, id) {
-    tabPanel(
-      title = paste0("page_", a),
-      titlePanel(title = title),
-      fluidRow(column(12, tab)),
+    tabPanelBody(
+      value = paste0("page_", a),
+      fluidRow(column(width = 12, tab)),
+      fluidRow(
+        width = 12,
+        tags$hr(),
+        fixedPanel(
+          style = paste0("background-color:", grDevices::grey(0.8), ";"),
+          bottom = 0,
+          left = 0,
+          right = 0,
+          height = 100
+        )
+      ),
       fluidRow(
         column(
-          6,
+          width = 6,
           if (!is.na(b))
-            actionButton(NS(id, paste0("page_", a, b)), "prev")
+            fixedPanel(
+              actionButton(NS(id, paste0("page_", a, b)), "prev"),
+              bottom = 25,
+              left = 25,
+              height = 50
+            )
         ),
         column(
-          6,
+          width = 6,
           if (!is.na(c))
-            actionButton(NS(id, paste0("page_", a, c)), "next")
+            fixedPanel(
+              actionButton(NS(id, paste0("page_", a, c)), "next"),
+              bottom = 25,
+              right = 25,
+              height = 50
+            )
         )
       )
     )

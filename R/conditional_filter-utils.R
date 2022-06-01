@@ -1,7 +1,7 @@
 #' Build a controller based on data
 #'
-#' @param dat The data supplied as `dataframe` or tibble.
-#' @param session Namespace of the module or session.
+#' @param dat The data supplied as `dataframe` or `tibble`.
+#' @param session Shiny session object.
 #' @param labels Labels for the controllers (defaults to the variable names).
 #'  Must be a named vector where the names refer to the names of the original
 #'  data.
@@ -13,12 +13,18 @@
 #'  filtering (defaults to FALSE).
 #' @param update Logical indicating whether ui controllers are ui- or
 #'  server-side for updating the controllers ranges.
+#' @param method Method to use for switch_controller condition (defaults to
+#'  `length`).
+#' @param val Value to use for switch_controller condition (defaults to
+#'  `1`)
+#' @param logical Boolean to determine whether the switch_controller is
+#'  constructed for logical values.
 #'
 #' @return Shiny controller call.
 #' @export
 detect_controller <- function(
     dat,
-    session,
+    session = getDefaultReactiveDomain(),
     labels = character(1),
     external = character(1),
     remove_na = FALSE,
@@ -80,10 +86,12 @@ detect_controller_ <- function(col, session, label, remove_na = FALSE,
     args[[1]] <- paste0("update", args[[1]])
     # add session and id
     args[[2]] <- append(c(session = session, inputId = id), args[[2]])
+    # set choices and ranges to NULL as these won't change now
+    args[[2]]$choices <- args[[2]]$min <- args[[2]]$max <- args[[2]]$multiple <- NULL
   } else {
     # add id and optional label
     args[[2]] <- append(
-      c(inputId = NS(session, id), label = label),
+      c(inputId = session$ns(id), label = label),
       args[[2]]
     )
   }
@@ -121,7 +129,7 @@ logical_controller <- function(
   }
 
   # make the isolate call
-  logi_iso <- rlang::call2("isolate", rlang::expr(input$logi), .ns = "shiny")
+  logi_iso <- rlang::call2("isolate", rlang::parse_expr("input$logi"), .ns = "shiny")
 
   # javascript for selectize
   js_lgl <- list(
@@ -132,7 +140,7 @@ logical_controller <- function(
   # core arguments for logical selection
   logi <- list(
     session  = if (isTRUE(update)) session else NULL,
-    inputId = if (isTRUE(update)) "logi" else NS(session, "logi"),
+    inputId = if (isTRUE(update)) "logi" else session$ns( "logi"),
     label =  labels,
     choices = detect_lgl,
     selected = if (isTRUE(update)) logi_iso else NULL,
@@ -168,7 +176,7 @@ switch_controller <- function(
   # shinyjs for logical columns
   if (isTRUE(logical)) {
 
-    cl <- rlang::call2("detect_lgl", substitute(dat), ignore = ignore,
+    cl <- rlang::call2("detect_lgl", rlang::quo_get_expr(dat), ignore = ignore,
                        external = external)
     ctrls <- switch_controller_(cl, method, val)
 
@@ -226,8 +234,12 @@ switch_controller_ <- function(col, method = "length", val = 1,
 
 #' Base filter method based on the class of column
 #'
-#' @param col Column
-#' @param remove_na Remove NA's
+#' @param col Column of a dataframe.
+#' @param expr The expression of param `col`.
+#' @param env The original environment of param `col`.
+#' @param remove_na Remove NA's.
+#' @param update Logical indicating whether ui controllers are ui- or
+#'  server-side for updating the controllers ranges.
 #'
 #' @return List containing the ingredients to build a Shiny controller.
 #' @export
@@ -256,10 +268,11 @@ col_vals.numeric <- function(col, expr, env, remove_na = FALSE, update = FALSE) 
   # return
   list(cnr, vls)
 }
-#' @rdname detect_controller
+#' @rdname col_vals
 #'
 #' @export
-col_vals.character <- function(col, expr, env, remove_na = FALSE, update = FALSE) {
+col_vals.character <- function(col, expr, env, remove_na = FALSE,
+                               update = FALSE) {
 
   # body of arguments
   vls <- rlang::exprs(
@@ -277,11 +290,11 @@ col_vals.character <- function(col, expr, env, remove_na = FALSE, update = FALSE
   # return
   list(cnr, vls)
 }
-#' @rdname detect_controller
+#' @rdname col_vals
 #'
 #' @export
 col_vals.factor <- col_vals.character
-#' @rdname detect_controller
+#' @rdname col_vals
 #'
 #' @export
 col_vals.logical <- function(col, expr, env, remove_na = FALSE, update = FALSE)NULL
@@ -294,7 +307,7 @@ detect_lvls <- function(col, remove_na) {
   if (isTRUE(remove_na)) {
     col <- rlang::call2("na.omit", col)
   }
-  rlang::call2("levels", rlang::call2("as.factor", col))
+  rlang::call2("unique", rlang::call2("as.factor", col))
 }
 
 # generate expression for numeric toggle switch condition

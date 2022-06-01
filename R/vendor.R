@@ -21,7 +21,7 @@ shinymods_vendor <- function(module, path = ".") {
   old <- system.file("R", module, package = "shinymods", mustWork = TRUE)
 
   # new path to R directory file
-  new <- file.path(path, "R", module)
+  new <- file.path(path, "src", "R", module)
 
   if (file.exists(new)) {
     stop("'", new, "' already exists\n * run file.remove('", new,
