@@ -26,10 +26,11 @@ detect_controller <- function(
     dat,
     session = getDefaultReactiveDomain(),
     labels = character(1),
+    ignore = character(1),
     external = character(1),
     remove_na = FALSE,
     update = FALSE
-    ) {
+  ) {
 
   # defuse
   dat <- rlang::enquo(dat)
@@ -59,7 +60,7 @@ detect_controller <- function(
     purrr::compact()
 
   # discard external controllers
-  ctrls[!names(ctrls) %in% external]
+  ctrls[!names(ctrls) %in% c(external, ignore)]
 }
 
 # col = qusoure
@@ -201,7 +202,8 @@ switch_controller <- function(
     purrr::compact()
   }
 
-  ctrls
+  # discard external controllers
+  ctrls[!names(ctrls) %in% c(external, ignore)]
 }
 
 switch_controller_ <- function(col, method = "length", val = 1,

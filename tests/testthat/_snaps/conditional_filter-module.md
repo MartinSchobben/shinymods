@@ -81,6 +81,43 @@
           value = range(cars$dist, na.rm = TRUE))
       
 
+---
+
+    Code
+      filter_controllers(iris, session, ignore = c("Petal.Width", "Petal.Length"))
+    Output
+      $Sepal.Length
+      sliderInput(inputId = "testthat-Sepal.Length", label = "Sepal.Length", 
+          min = 4.3, max = 7.9, value = c(4.3, 7.9))
+      
+      $Sepal.Width
+      sliderInput(inputId = "testthat-Sepal.Width", label = "Sepal.Width", 
+          min = 2, max = 4.4, value = c(2, 4.4))
+      
+      $Species
+      selectInput(inputId = "testthat-Species", label = "Species", 
+          choices = 1:3, selected = 1:3, multiple = TRUE)
+      
+
+---
+
+    Code
+      filter_controllers(iris, session, ignore = c("Petal.Width", "Petal.Length"),
+      update = TRUE)
+    Output
+      $Sepal.Length
+      updateSliderInput(session = <environment>, inputId = "Sepal.Length", 
+          value = range(iris$Sepal.Length, na.rm = TRUE))
+      
+      $Sepal.Width
+      updateSliderInput(session = <environment>, inputId = "Sepal.Width", 
+          value = range(iris$Sepal.Width, na.rm = TRUE))
+      
+      $Species
+      updateSelectInput(session = <environment>, inputId = "Species", 
+          selected = unique(as.factor(iris$Species)))
+      
+
 # helpers work
 
     Code
@@ -120,10 +157,6 @@
       
       $logi
       $logi[[1]]
-      shinyjs::toggleState("logi", length(detect_lgl(cars2, ignore = "", 
-          external = "")) > 1)
-      
-      $logi[[2]]
       updateSelectizeInput(session = <environment>, inputId = "logi", 
           label = "", choices = detect_lgl(cars2, ignore = "", external = ""), 
           selected = shiny::isolate(input$logi))
@@ -141,8 +174,6 @@
           updateSelectizeInput(session = <environment>, inputId = "logi", 
               label = "", choices = detect_lgl(cars2, ignore = "", 
                   external = ""), selected = shiny::isolate(input$logi))
-          shinyjs::toggleState("logi", length(detect_lgl(cars2, ignore = "", 
-              external = "")) > 1)
           updateSliderInput(session = <environment>, inputId = "dist", 
               value = range(cars2$dist, na.rm = TRUE))
           shinyjs::toggleState("dist", length(unique(cars2$dist)) > 
@@ -172,9 +203,6 @@
     Code
       hdl2
     Output
-      $speed
-      shinyjs::toggleState("speed", length(unique(cars2$speed)) > 1)
-      
       $dist
       $dist[[1]]
       shinyjs::toggleState("dist", length(unique(cars2$dist)) > 1)
@@ -186,10 +214,6 @@
       
       $logi
       $logi[[1]]
-      shinyjs::toggleState("logi", length(detect_lgl(cars2, ignore = "", 
-          external = "speed")) > 1)
-      
-      $logi[[2]]
       updateSelectizeInput(session = <environment>, inputId = "logi", 
           label = "", choices = detect_lgl(cars2, ignore = "", external = "speed"), 
           selected = shiny::isolate(input$logi))
@@ -207,8 +231,6 @@
           updateSelectizeInput(session = <environment>, inputId = "logi", 
               label = "", choices = detect_lgl(cars2, ignore = "", 
                   external = "speed"), selected = shiny::isolate(input$logi))
-          shinyjs::toggleState("logi", length(detect_lgl(cars2, ignore = "", 
-              external = "speed")) > 1)
           updateSliderInput(session = <environment>, inputId = "dist", 
               value = range(cars2$dist, na.rm = TRUE))
           shinyjs::toggleState("dist", length(unique(cars2$dist)) > 

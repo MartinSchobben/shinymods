@@ -18,8 +18,17 @@ test_that("gui and update gui can be generated", {
   expect_snapshot(
     filter_controllers(cars, session, update = T, shinyjs = T)
   )
+  # external
   expect_snapshot(
     filter_controllers(cars, session, external =  character(0),  update = TRUE)
+  )
+  # ignore
+  expect_snapshot(
+    filter_controllers(iris, session, ignore = c("Petal.Width", "Petal.Length"))
+  )
+  expect_snapshot(
+    filter_controllers(iris, session, ignore = c("Petal.Width", "Petal.Length"),
+                       update = TRUE)
   )
 })
 

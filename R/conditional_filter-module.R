@@ -138,12 +138,14 @@ filter_controllers <- function(
   dat <- rlang::enquo(dat)
 
   # create automatically detected controllers
-  ctrls <- rlang::inject(detect_controller(!!dat, session, labels, external,
-                                           remove_na, update))
+  ctrls <- rlang::inject(detect_controller(!!dat, session, labels, ignore,
+                                           external, remove_na, update))
 
   # add shinyjs switch controls
   if (all(isTRUE(shinyjs), isTRUE(update))) {
-    swth <- rlang::inject(switch_controller(!!dat, remove_na = remove_na))
+    swth <- rlang::inject(switch_controller(!!dat, external = external,
+                                            ignore = ignore,
+                                            remove_na = remove_na))
   }
 
   # create logical controller (needs updating)
